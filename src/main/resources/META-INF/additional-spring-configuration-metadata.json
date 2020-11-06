@@ -1,0 +1,27 @@
+{"properties": [
+  {
+    "name": "app.upload.dir",
+    "type": "java.lang.String",
+    "description": "only dir name for uploaded files 'app.upload.dir'"
+  },
+  {
+    "name": "aws.secret",
+    "type": "java.lang.String",
+    "description": "Aws secret key 'aws.secret'"
+  },
+  {
+    "name": "aws.access",
+    "type": "java.lang.String",
+    "description": "Aws access key id 'aws.access'"
+  },
+  {
+    "name": "aws.bucket",
+    "type": "java.lang.String",
+    "description": "Aws bucket name for 'aws.bucket'"
+  },
+  {
+    "name": "aws.region",
+    "type": "java.lang.String",
+    "description": "Aws region of bucket for 'aws.region'"
+  }
+]}
