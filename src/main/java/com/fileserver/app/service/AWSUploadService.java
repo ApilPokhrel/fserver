@@ -43,7 +43,7 @@ public class AWSUploadService {
     public String uploadDir;
 
 
-    public CompletableFuture<Void> multipartUpload(String bucketName, String keyName, String contentType) {
+    public CompletableFuture<Void> multipartUploadAsync(String bucketName, String keyName, String contentType) {
         Regions clientRegion = Regions.US_EAST_2;
         String filePath = uploadDir;
 
@@ -123,6 +123,63 @@ public class AWSUploadService {
         }
     }
 
+    public void multipartUploadSync(String bucketName, String keyName, String contentType) {
+        Regions clientRegion = Regions.US_EAST_2;
+        String filePath = uploadDir;
+
+        File file = new File(filePath, keyName);
+        long contentLength = file.length();
+        long partSize = 10 * 1024 * 1024L; // Set part size to 10 MB.
+
+        try {
+            AWSCredentials credentials = new BasicAWSCredentials(aws_access, aws_secret);
+
+            AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+            .withRegion(clientRegion)
+            .withCredentials(new AWSStaticCredentialsProvider(credentials))
+            .build();
+
+            List<PartETag> partETags = new ArrayList<>();
+
+            InitiateMultipartUploadRequest initRequest = new InitiateMultipartUploadRequest(bucketName, keyName);
+            initRequest.withCannedACL(CannedAccessControlList.PublicRead);
+            ObjectMetadata metadata = new ObjectMetadata();
+            metadata.setContentType(contentType);
+            initRequest.setObjectMetadata(metadata);
+
+            InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+
+            long filePosition = 0;
+            for (int i = 1; filePosition < contentLength; i++) {
+                partSize = Math.min(partSize, (contentLength - filePosition));
+
+                UploadPartRequest uploadRequest = new UploadPartRequest()
+                        .withBucketName(bucketName)
+                        .withKey(keyName)
+                        .withUploadId(initResponse.getUploadId())
+                        .withPartNumber(i)
+                        .withFileOffset(filePosition)
+                        .withFile(file)
+                        .withPartSize(partSize);
+
+                // Upload the part and add the response's ETag to our list.
+                UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+                partETags.add(uploadResult.getPartETag());
+
+                filePosition += partSize;
+            }
+
+            // Complete the multipart upload.
+            CompleteMultipartUploadRequest compRequest = new CompleteMultipartUploadRequest(bucketName, keyName,
+                    initResponse.getUploadId(), partETags);
+            s3Client.completeMultipartUpload(compRequest);
+        } catch (AmazonServiceException e) {
+            throw new AWSUploadException(e.getErrorMessage());
+        } catch (SdkClientException ex) {
+            throw new AWSUploadException(ex.getLocalizedMessage());
+        }
+    }
+
 
     public void upload(String bucketName, String keyName, String contentType){
         Regions clientRegion = Regions.US_EAST_2;
@@ -143,7 +200,6 @@ public class AWSUploadService {
                     s3Client.putObject(request);
 
         } catch (AmazonServiceException e) {
-            e.printStackTrace();
             throw new AWSUploadException(e.getErrorMessage());
         } catch (SdkClientException ex) {
             ex.printStackTrace();

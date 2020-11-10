@@ -31,6 +31,7 @@ public class FileController {
 
     String completed = "completed";
     String uploaded = "uploaded";
+    String bucket = "nomore";
 
     @Autowired
     public FileController(FileService fileService, FFMPEGService ffmpegService, AWSUploadService awsUploadService,
@@ -41,8 +42,57 @@ public class FileController {
         this.fileInterface = fileInterface;
     }
 
+    @PostMapping("/upload/video/async")
+    public CompletableFuture<Object> uploadFileAsync(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+        if (file == null) {
+            throw new NotFoundException("file not found");
+        }
+        String contentType = file.getContentType();
+        String name = file.getOriginalFilename();
+        if (contentType != null && !contentType.startsWith("video/")) {
+            throw new NotSupportedException("File is not type of video");
+        }
+
+        //File upload first
+        //Parallel -> Upload to AWS, Create a preview
+        //After preview -> upload preview to aws
+
+        File fileModel = new File();
+
+        Optional<File> isFile = fileInterface.getByName(name);
+        if (!isFile.isPresent()) {
+            fileService.uploadFile(file); // after this
+            String origin = request.getHeader("origin");
+            fileModel.setName(name);
+            fileModel.setType(contentType);
+            fileModel.setSize(file.getSize());
+            fileModel.setOrigin(origin);
+            fileModel = fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException("file not saved in db"));
+        } else {
+            fileModel = isFile.get();
+            if(!fileService.exists(fileModel.getName())){
+                fileService.uploadFile(file); // if not in directory upload file
+                fileInterface.updateByName(fileModel.getName(), uploaded, false);
+                fileInterface.updateByName(fileModel.getName(), completed, false);
+            }
+        }
+        final boolean is_uploaded = fileModel.isUploaded();
+        return CompletableFuture.supplyAsync(() -> {
+            if (!is_uploaded) {
+                return awsUploadService.multipartUploadAsync(bucket, name, contentType).thenApplyAsync(f -> {
+                    Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
+                    preview(fm.get());
+                    return fm.get();
+                });
+
+            } else {
+                return fileInterface.getByName(name).get();
+            }
+         });
+    }
+
     @PostMapping("/upload/video")
-    public CompletableFuture<Object> uploadFile(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
+    public CompletableFuture<Object> uploadFileSync(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
         if (file == null) {
             throw new NotFoundException("file not found");
         }
@@ -74,12 +124,10 @@ public class FileController {
         final boolean is_uploaded = fileModel.isUploaded();
         return CompletableFuture.supplyAsync(() -> {
             if (!is_uploaded) {
-                return awsUploadService.multipartUpload("nomore", name, contentType).thenApplyAsync(f -> {
+                 awsUploadService.multipartUploadSync(bucket, name, contentType);
                     Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
                     preview(fm.get());
                     return fm.get();
-                });
-
             } else {
                 return fileInterface.getByName(name).get();
             }
