@@ -30,14 +30,14 @@ public class AuthController {
     private  String NOT_FOUND = "Role Not Found";
 
     @PostMapping("/")
-    CompletableFuture<ResponseEntity<UserRoleSchema>> createRole(@RequestBody UserRoleSchema role) {
+    public CompletableFuture<ResponseEntity<UserRoleSchema>> createRole(@RequestBody UserRoleSchema role) {
         return CompletableFuture.supplyAsync(() -> ResponseEntity.ok(UserRole.add(role).get()))
                 .exceptionally(ex -> ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null));
 
     }
 
     @GetMapping("/")
-    CompletableFuture<ResponseEntity<UserRoleP>> roles(@RequestParam("start") long start,
+    public CompletableFuture<ResponseEntity<UserRoleP>> roles(@RequestParam("start") long start,
             @RequestParam("limit") long limit, @RequestParam(value = "key", required = false) String key,
             @RequestParam(value = "q", required = false) String q) {
         return CompletableFuture.supplyAsync(() -> ResponseEntity.ok(UserRole.list(start, limit, key, q)))
@@ -45,37 +45,37 @@ public class AuthController {
     }
 
     @GetMapping("/any/{name}")
-    CompletableFuture<UserRoleSchema> getByName(@PathVariable("name") String name) {
+    public CompletableFuture<UserRoleSchema> getByName(@PathVariable("name") String name) {
         return CompletableFuture
                 .supplyAsync(() -> UserRole.getByName(name).orElseThrow(() -> new NotFoundException(NOT_FOUND)));
     }
 
     @GetMapping("/{id}")
-    CompletableFuture<UserRoleSchema> get(@PathVariable("id") String id) {
+    public CompletableFuture<UserRoleSchema> get(@PathVariable("id") String id) {
         return CompletableFuture
                 .supplyAsync(() -> UserRole.getById(id).orElseThrow(() -> new NotFoundException(NOT_FOUND)));
     }
 
     @PatchMapping("/{id}")
-    CompletableFuture<UserRoleSchema> updateRole(@PathVariable("id") String id, @RequestBody UserRoleSchema role) {
+    public CompletableFuture<UserRoleSchema> updateRole(@PathVariable("id") String id, @RequestBody UserRoleSchema role) {
         return CompletableFuture.supplyAsync(
                 () -> UserRole.update(id, role).orElseThrow(() -> new NotFoundException(NOT_FOUND)));
     }
 
     @PatchMapping("/add/perms/{id}")
-    CompletableFuture<UserRoleSchema> addPerms(@PathVariable("id") String id, @RequestBody List<String> perms) {
+    public CompletableFuture<UserRoleSchema> addPerms(@PathVariable("id") String id, @RequestBody List<String> perms) {
         return CompletableFuture.supplyAsync(
                 () -> UserRole.addPerms(id, perms).orElseThrow(() -> new NotFoundException(NOT_FOUND)));
     }
 
     @PatchMapping("/remove/perms/{id}")
-    CompletableFuture<UserRoleSchema> removePerms(@PathVariable("id") String id, @RequestBody List<String> perms) {
+    public CompletableFuture<UserRoleSchema> removePerms(@PathVariable("id") String id, @RequestBody List<String> perms) {
         return CompletableFuture.supplyAsync(
                 () -> UserRole.removePerms(id, perms).orElseThrow(() -> new NotFoundException(NOT_FOUND)));
     }
 
     @PatchMapping("/remove/{id}")
-    CompletableFuture<UserRoleSchema> remove(@PathVariable("id") String id) {
+    public CompletableFuture<UserRoleSchema> remove(@PathVariable("id") String id) {
         return CompletableFuture
                 .supplyAsync(() -> UserRole.remove(id).orElseThrow(() -> new NotFoundException(NOT_FOUND)));
     }

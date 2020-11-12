@@ -20,4 +20,13 @@ public class TokenUtil {
         .withExpiresAt(new Date(System.currentTimeMillis() + SecurityConstants.EXPIRATION_TIME))
         .sign(Algorithm.HMAC512(SecurityConstants.SECRET.getBytes()));
     }
+
+
+    public static String create(String id, long exp, List<String> perms){
+        return JWT.create()
+        .withSubject(id)
+        .withClaim("perms", perms)
+        .withExpiresAt(new Date(System.currentTimeMillis() + exp))
+        .sign(Algorithm.HMAC512(SecurityConstants.SECRET.getBytes()));
+    }
 }

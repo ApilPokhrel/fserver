@@ -1,16 +1,15 @@
 package com.fileserver.app.controller;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
 
-import javax.validation.ConstraintViolationException;
 import javax.validation.Valid;
 
 import com.fileserver.app.dao.user.UserInterface;
 import com.fileserver.app.dao.user.UserRolesInterface;
 import com.fileserver.app.entity.user.User;
+import com.fileserver.app.entity.user.UserDto;
+import com.fileserver.app.service.AuthService;
 import com.fileserver.app.util.TokenUtil;
 
 import org.springframework.security.access.annotation.Secured;
@@ -32,42 +31,35 @@ public class UserController {
     private UserInterface userInterface;
     private BCryptPasswordEncoder bCryptPasswordEncoder;
     private UserRolesInterface rolesInterface;
+    private AuthService authService;
 
-    public UserController(UserInterface userInterface, BCryptPasswordEncoder bCryptPasswordEncoder, UserRolesInterface rolesInterface){
+    public UserController(UserInterface userInterface, BCryptPasswordEncoder bCryptPasswordEncoder,
+            UserRolesInterface rolesInterface, AuthService authService) {
         this.userInterface = userInterface;
         this.bCryptPasswordEncoder = bCryptPasswordEncoder;
         this.rolesInterface = rolesInterface;
+        this.authService = authService;
     }
-
 
     @PostMapping("/")
     @PreAuthorize("permitAll()")
-    public User add(@Valid @RequestBody User user){
+    public User add(@Valid @RequestBody UserDto user) {
         user.setPassword(bCryptPasswordEncoder.encode(user.getPassword()));
         return userInterface.add(user).orElseThrow();
     }
 
-
     @PostMapping("/login")
-    public Map<String, Object> login(@RequestBody Map<String, String> body){
-        Optional<User> user = userInterface.getByContact(body.get("username"));
-        if(user.isPresent()){
-            if(bCryptPasswordEncoder.matches(body.get("password"), user.get().getPassword())){
-                Map<String, Object> res = new HashMap<>();
-                res.put("user", user.get());
-                res.put("token", TokenUtil.create(user.get().get_id(), user.get().queryPerms(rolesInterface)));
-                return res;
-            } else {
-                throw new ConstraintViolationException("password didn't matched", new HashSet<>());
-            }
-        } else {
-           throw new ConstraintViolationException("user not found", new HashSet<>());
-        }
+    public Map<String, Object> login(@RequestBody Map<String, String> body) {
+        User user = authService.login(body.get("username"), body.get("password"));
+        Map<String, Object> res = new HashMap<>();
+        res.put("user", user);
+        res.put("token", TokenUtil.create(user.get_id(), user.queryPerms(rolesInterface)));
+        return res;
     }
 
     @Secured("ROLE_user_read")
     @GetMapping("/{username}")
-    public User get(@RequestParam("username") String username){
+    public User get(@RequestParam("username") String username) {
         return userInterface.getByContact(username).orElseThrow();
     }
 

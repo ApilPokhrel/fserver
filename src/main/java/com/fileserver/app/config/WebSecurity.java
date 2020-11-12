@@ -44,6 +44,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
         http.cors().and().csrf().disable().authorizeRequests()
                 .antMatchers(HttpMethod.POST, SecurityConstants.SIGN_UP_URL).permitAll()
                 .antMatchers(HttpMethod.POST, "/api/v1/user/login").permitAll()
+                .antMatchers(HttpMethod.POST, "/api/v1/file/login").permitAll()
                 .antMatchers(HttpMethod.POST, "/api/v1/role/").permitAll()
                 .antMatchers(SWAGGER_URLS).permitAll()
                 .anyRequest().authenticated()
