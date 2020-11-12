@@ -22,6 +22,7 @@ import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.PutObjectRequest;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.fileserver.app.config.JaxbForkJoinWorkerThreadFactory;
@@ -198,6 +199,26 @@ public class AWSUploadService {
                     metadata.setContentType(contentType);
                     request.setMetadata(metadata);
                     s3Client.putObject(request);
+
+        } catch (AmazonServiceException e) {
+            throw new AWSUploadException(e.getErrorMessage());
+        } catch (SdkClientException ex) {
+            ex.printStackTrace();
+            throw new AWSUploadException(ex.getLocalizedMessage());
+        }
+    }
+
+    public void remove(String bucketName, String keyName){
+        Regions clientRegion = Regions.US_EAST_2;
+        try {
+
+            AWSCredentials credentials = new BasicAWSCredentials(aws_access, aws_secret);
+            AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+                    .withRegion(clientRegion)
+                    .withCredentials(new AWSStaticCredentialsProvider(credentials))
+                    .build();
+
+                    s3Client.deleteObject(new DeleteObjectRequest(bucketName, keyName));
 
         } catch (AmazonServiceException e) {
             throw new AWSUploadException(e.getErrorMessage());

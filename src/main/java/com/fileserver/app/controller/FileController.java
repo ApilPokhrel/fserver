@@ -220,6 +220,7 @@ public class FileController {
             awsUploadService.multipartUploadSync(bucket, name, contentType);
             Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
             preview(fm.get());
+            awsUploadService.remove(bucket, name);
             return fm.get();
         });
     }
