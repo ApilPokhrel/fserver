@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.fileserver.app.entity.file.File;
 
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -46,7 +47,20 @@ public class FileImpl implements FileInterface {
         Query query = new Query(Criteria.where("name").is(name));
         Update update = new Update().set(key, value);
         FindAndModifyOptions options = new FindAndModifyOptions().returnNew(true);
-        return Optional.ofNullable(mTemplate.findAndModify(query, update, options, File.class));    }
+        return Optional.ofNullable(mTemplate.findAndModify(query, update, options, File.class));
+    }
+
+    @Override
+    public Optional<File> removeByName(String name) {
+        Query query = new Query(Criteria.where("name").is(name));
+        return Optional.ofNullable(mTemplate.findAndRemove(query, File.class));
+    }
+
+    @Override
+    public Optional<File> removeById(String id) {
+        Query query = new Query(Criteria.where("_id").is(new ObjectId(id)));
+        return Optional.ofNullable(mTemplate.findAndRemove(query, File.class));
+    }
 
     @Override
     public Optional<File> incompleted(String parent) {

@@ -15,4 +15,6 @@ public interface FileInterface {
     Optional<File> updateByName(String name, String key, Object value);
     List<File> incompletes(boolean isParent);
     Optional<File> incompleted(String parent);
+    Optional<File> removeByName(String name);
+    Optional<File> removeById(String id);
 }

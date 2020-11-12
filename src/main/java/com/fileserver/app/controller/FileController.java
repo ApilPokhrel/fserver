@@ -203,11 +203,13 @@ public class FileController {
             throw new NotSupportedException(fnv);
         }
 
-        Optional<File> isFile = fileInterface.getById(id);
+        Optional<File> isFile = fileInterface.removeById(id);
         if (!isFile.isPresent())
             throw new NotSupportedException("cannot replace file not found");
         File fileModel = isFile.get();
+
         fileService.remove(fileModel.getName());
+        CompletableFuture.runAsync(() -> awsUploadService.remove(bucket, fileModel.getName()));
 
         String origin = request.getHeader(originHeader);
         fileModel.setName(name);
@@ -220,7 +222,6 @@ public class FileController {
             awsUploadService.multipartUploadSync(bucket, name, contentType);
             Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
             preview(fm.get());
-            awsUploadService.remove(bucket, name);
             return fm.get();
         });
     }

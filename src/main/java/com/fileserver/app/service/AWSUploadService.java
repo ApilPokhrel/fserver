@@ -221,10 +221,9 @@ public class AWSUploadService {
                     s3Client.deleteObject(new DeleteObjectRequest(bucketName, keyName));
 
         } catch (AmazonServiceException e) {
-            throw new AWSUploadException(e.getErrorMessage());
+            e.getStatusCode();
         } catch (SdkClientException ex) {
-            ex.printStackTrace();
-            throw new AWSUploadException(ex.getLocalizedMessage());
+            ex.getMessage();
         }
     }
 
