@@ -63,18 +63,28 @@ public class FFMPEGService {
 
     //10 min clip
     private double[] generateClipTimes(double duration){
-        double[] dd = new double[5];
+        double[] dd = new double[10];
         if(duration < 10d) {
             return new double[0];
         }
         dd[0] = 4d;
-        double firstNext = duration / 4d;
-        double middle = duration / 3d;
-        double lastBefore = duration / 2d;
-        dd[1] = firstNext;
-        dd[2] = middle;
-        dd[3] = lastBefore;
-        if((duration - 40d) > 4) dd[4] = duration - 40d;
+        double one = duration / 9d;
+        double two = duration / 8d;
+        double three = duration / 7d;
+        double four = duration / 6d;
+        double five = duration / 5d;
+        double six = duration / 4d;
+        double seven = duration / 3d;
+        double eight = duration / 2d;
+        dd[1] = one;
+        dd[2] = two;
+        dd[3] = three;
+        dd[4] = four;
+        dd[5] = five;
+        dd[6] = six;
+        dd[7] = seven;
+        dd[8] = eight;
+        if((duration - 40d) > 4) dd[9] = duration - 40d;
         return dd;
     }
 
@@ -86,7 +96,7 @@ public class FFMPEGService {
             .setInput(uploadDir + "/" + filename)
             .addOutput(uploadDir + "/" + name + ".mp4")// Filename, or a FFmpegProbeResult
             .disableAudio()
-            .addExtraArgs("-t", "2", "-c:v", "copy")
+            .addExtraArgs("-t", "1", "-c:v", "copy")
             .done();
             executor.createJob(builder).run();
     }
