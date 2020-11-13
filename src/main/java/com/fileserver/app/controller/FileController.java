@@ -201,6 +201,7 @@ public class FileController {
         if (!isFile.isPresent())
             throw new NotSupportedException("cannot replace file not found");
 
+        fileService.uploadFile(file); // upload file
         File fileModel = isFile.get();
         String name = fileModel.getName();
 
