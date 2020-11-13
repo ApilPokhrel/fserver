@@ -208,8 +208,15 @@ public class FileController {
             throw new NotSupportedException("cannot replace file not found");
         File fileModel = isFile.get();
 
-        fileService.remove(fileModel.getName());
-        CompletableFuture.runAsync(() -> awsUploadService.remove(bucket, fileModel.getName()));
+        CompletableFuture.runAsync(() -> {
+            fileService.remove(fileModel.getName());
+            awsUploadService.remove(bucket, fileModel.getName());
+            Optional<File> preview = fileInterface.removeChild(fileModel.getName(), "video/mp4");
+            if(preview.isPresent()){
+                fileService.remove(preview.get().getName());
+                awsUploadService.remove(bucket, preview.get().getName());
+            }
+        });
 
         String origin = request.getHeader(originHeader);
         fileModel.setName(name);

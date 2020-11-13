@@ -20,6 +20,8 @@ public class FileImpl implements FileInterface {
     @Autowired
     private MongoTemplate mTemplate;
 
+    private String is_parent = "is_parent";
+
     @Override
     public Optional<File> add(File file) {
         return Optional.ofNullable(mTemplate.save(file));
@@ -32,7 +34,7 @@ public class FileImpl implements FileInterface {
 
     @Override
     public List<File> incompletes(boolean isParent) {
-        Query query = new Query(Criteria.where("is_parent").is(isParent).and("completed").is(false));
+        Query query = new Query(Criteria.where(is_parent).is(isParent).and("completed").is(false));
         return mTemplate.find(query, File.class);
     }
 
@@ -64,7 +66,25 @@ public class FileImpl implements FileInterface {
 
     @Override
     public Optional<File> incompleted(String parent) {
-        Query query = new Query(Criteria.where("is_parent").is(false).and("parent").is(parent));
+        Query query = new Query(Criteria.where(is_parent).is(false).and("parent").is(parent));
         return Optional.ofNullable(mTemplate.findOne(query, File.class));
+    }
+
+    @Override
+    public Optional<File> getOne(String field, String value) {
+        Query query = new Query(Criteria.where(field).is(value));
+        return Optional.ofNullable(mTemplate.findOne(query, File.class));
+    }
+
+    @Override
+    public Optional<File> removeOne(String field, String value) {
+        Query query = new Query(Criteria.where(field).is(value));
+        return Optional.ofNullable(mTemplate.findAndRemove(query, File.class));
+    }
+
+    @Override
+    public Optional<File> removeChild(String parent, String type) {
+        Query query = new Query(Criteria.where("parent").is(parent).and(is_parent).is(true).and("type").is(type));
+        return Optional.ofNullable(mTemplate.findAndRemove(query, File.class));
     }
 }
