@@ -175,8 +175,10 @@ public class AWSUploadService {
                     initResponse.getUploadId(), partETags);
             s3Client.completeMultipartUpload(compRequest);
         } catch (AmazonServiceException e) {
+            e.printStackTrace();
             throw new AWSUploadException(e.getErrorMessage());
         } catch (SdkClientException ex) {
+            ex.printStackTrace();
             throw new AWSUploadException(ex.getLocalizedMessage());
         }
     }
