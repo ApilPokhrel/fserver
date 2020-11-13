@@ -123,25 +123,23 @@ public class FileController {
     public Map<String, Object> login(@Valid @RequestBody FileBody body) {
         User user = authService.login(body.getUsername(), body.getPassword());
         Optional<File> filePayload = fileInterface.getByName(body.getName());
+        Map<String, Object> res = new HashMap<>();
         if (filePayload.isPresent() && body.isReplace()) {
             // send a route that will delete file from DB and upload it
             // No checks like first time
-            Map<String, Object> res = new HashMap<>();
-            res.put("user", user);
             res.put("url", "/upload/video/replace/" + filePayload.get().get_id());
-            res.put("token", TokenUtil.create(user.get_id(), body.getExp(), user.queryPerms(rolesInterface)));
             return res;
 
         } else {
             // Check File in drive if not upload
             // Check Uploaded if not upload
             // Check Completed if not complete
-            Map<String, Object> res = new HashMap<>();
-            res.put("user", user);
             res.put("url", "/upload/video");
-            res.put("token", TokenUtil.create(user.get_id(), body.getExp(), user.queryPerms(rolesInterface)));
-            return res;
         }
+        res.put("user", user);
+        res.put("token", TokenUtil.create(user.get_id(), body.getExp(), user.queryPerms(rolesInterface)));
+        return res;
+
     }
 
     @PostMapping("/upload/video")
@@ -205,15 +203,13 @@ public class FileController {
             throw new NotSupportedException("cannot replace file not found");
         File fileModel = isFile.get();
 
-        CompletableFuture.runAsync(() -> {
-            fileService.remove(fileModel.getName());
-            awsUploadService.remove(bucket, fileModel.getName());
-            Optional<File> preview = fileInterface.removeChild(fileModel.getName(), "video/mp4");
-            if (preview.isPresent()) {
-                fileService.remove(preview.get().getName());
-                awsUploadService.remove(bucket, preview.get().getName());
-            }
-        });
+        fileService.remove(fileModel.getName());
+        awsUploadService.remove(bucket, fileModel.getName());
+        Optional<File> preview = fileInterface.removeChild(fileModel.getName(), "video/mp4");
+        if (preview.isPresent()) {
+            fileService.remove(preview.get().getName());
+            awsUploadService.remove(bucket, preview.get().getName());
+        }
 
         String origin = request.getHeader(originHeader);
         fileModel.setName(name);
