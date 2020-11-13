@@ -220,6 +220,9 @@ public class FileController {
         fileModel.setType(contentType);
         fileModel.setSize(file.getSize());
         fileModel.setOrigin(origin);
+        fileModel.setUploaded(false);
+        fileModel.setCompleted(false);
+        fileModel.setProcessed(false);
         fileModel = fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));
 
         final boolean is_uploaded = fileModel.isUploaded();
