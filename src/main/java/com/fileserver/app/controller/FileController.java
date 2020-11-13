@@ -4,10 +4,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import com.fileserver.app.config.JaxbForkJoinWorkerThreadFactory;
 import com.fileserver.app.dao.file.FileInterface;
 import com.fileserver.app.dao.user.UserRolesInterface;
 import com.fileserver.app.entity.file.File;
@@ -202,13 +204,15 @@ public class FileController {
             throw new NotSupportedException("cannot replace file not found");
         File fileModel = isFile.get();
 
-        fileService.remove(fileModel.getName());
-        awsUploadService.remove(bucket, fileModel.getName());
-        Optional<File> preview = fileInterface.removeChild(fileModel.getName(), "video/mp4");
-        if (preview.isPresent()) {
-            fileService.remove(preview.get().getName());
-            awsUploadService.remove(bucket, preview.get().getName());
-        }
+        CompletableFuture.runAsync(() -> {
+            fileService.remove(fileModel.getName());
+            awsUploadService.remove(bucket, fileModel.getName());
+            Optional<File> preview = fileInterface.removeChild(fileModel.getName(), contentType);
+            if (preview.isPresent()) {
+                fileService.remove(preview.get().getName());
+                awsUploadService.remove(bucket, preview.get().getName());
+            }
+        });
 
         String origin = request.getHeader(originHeader);
         fileModel.setName(name);
@@ -222,7 +226,7 @@ public class FileController {
             Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
             preview(fm.get());
             return fm.get();
-        });
+        }, getJaxbExecutor());
     }
 
     @PostMapping("/clip-test")
@@ -272,5 +276,12 @@ public class FileController {
             fileInterface.updateByName(d.getName(), completed, isCompleted);
         }
         return d;
+    }
+
+
+    private ForkJoinPool getJaxbExecutor() {
+        JaxbForkJoinWorkerThreadFactory threadFactory = new JaxbForkJoinWorkerThreadFactory();
+        int parallelism = Math.min(0x7fff /* copied from ForkJoinPool.java */, Runtime.getRuntime().availableProcessors());
+        return new ForkJoinPool(parallelism, threadFactory, null, false);
     }
 }
