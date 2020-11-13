@@ -123,18 +123,15 @@ public class FileController {
     public Map<String, Object> login(@Valid @RequestBody FileBody body) {
         User user = authService.login(body.getUsername(), body.getPassword());
         Optional<File> filePayload = fileInterface.getByName(body.getName());
-        if (filePayload.isPresent()) {
-            if (body.isReplace()) {
-                // send a route that will delete file from DB and upload it
-                // No checks like first time
-                Map<String, Object> res = new HashMap<>();
-                res.put("user", user);
-                res.put("url", "/upload/video/replace/"+filePayload.get().get_id());
-                res.put("token", TokenUtil.create(user.get_id(), body.getExp(), user.queryPerms(rolesInterface)));
-                return res;
-            } else {
-                throw new NotSupportedException("Name already taken");
-            }
+        if (filePayload.isPresent() && body.isReplace()) {
+            // send a route that will delete file from DB and upload it
+            // No checks like first time
+            Map<String, Object> res = new HashMap<>();
+            res.put("user", user);
+            res.put("url", "/upload/video/replace/" + filePayload.get().get_id());
+            res.put("token", TokenUtil.create(user.get_id(), body.getExp(), user.queryPerms(rolesInterface)));
+            return res;
+
         } else {
             // Check File in drive if not upload
             // Check Uploaded if not upload
@@ -212,7 +209,7 @@ public class FileController {
             fileService.remove(fileModel.getName());
             awsUploadService.remove(bucket, fileModel.getName());
             Optional<File> preview = fileInterface.removeChild(fileModel.getName(), "video/mp4");
-            if(preview.isPresent()){
+            if (preview.isPresent()) {
                 fileService.remove(preview.get().getName());
                 awsUploadService.remove(bucket, preview.get().getName());
             }
@@ -223,7 +220,7 @@ public class FileController {
         fileModel.setType(contentType);
         fileModel.setSize(file.getSize());
         fileModel.setOrigin(origin);
-        fileInterface.add(fileModel); //save file
+        fileInterface.add(fileModel); // save file
 
         return CompletableFuture.supplyAsync(() -> {
             awsUploadService.multipartUploadSync(bucket, name, contentType);
