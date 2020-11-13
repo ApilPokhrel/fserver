@@ -60,36 +60,38 @@ public class FFMPEGService {
         }
 
         String preview = filename.replace(".mp4", "") + "_preview.mp4";
-        // combineClips(clips, preview);
-        combineClipsDemuxer(clips, preview);
+        combineClips(clips, preview);
+        // combineClipsDemuxer(clips, preview);
         return preview;
     }
 
     // 10 min clip
     private double[] generateClipTimes(double duration) {
-        double[] dd = new double[10];
+        double[] dd = new double[8];
         if (duration < 10d) {
             return new double[0];
         }
-        dd[0] = 4d;
-        double one = duration / 9d;
-        double two = duration / 8d;
-        double three = duration / 7d;
-        double four = duration / 6d;
-        double five = duration / 5d;
-        double six = duration / 4d;
-        double seven = duration / 3d;
-        double eight = duration / 2d;
-        dd[1] = one;
-        dd[2] = two;
-        dd[3] = three;
-        dd[4] = four;
-        dd[5] = five;
-        dd[6] = six;
-        dd[7] = seven;
-        dd[8] = eight;
-        if ((duration - 40d) > 4)
-            dd[9] = duration - 40d;
+
+        double step = ((duration - 10) / 10);
+
+        double one = step;
+        double two = step+one;
+        double three = step+two;
+        double four = step+three;
+        double five = step+four;
+        double six = step+five;
+        double seven = step+six;
+        double eight = step+seven;
+        double nine = step+eight;
+
+        dd[0] = two;
+        dd[1] = three;
+        dd[2] = four;
+        dd[3] = five;
+        dd[4] = six;
+        dd[5] = seven;
+        dd[6] = eight;
+        dd[7] = nine;
         return dd;
     }
 
@@ -99,7 +101,7 @@ public class FFMPEGService {
         FFmpegBuilder builder = new FFmpegBuilder().setStartOffset((long) d, TimeUnit.SECONDS) // offset -ss 00:03
                 .setInput(uploadDir + "/" + filename).addOutput(uploadDir + "/" + name + ".mp4")// Filename, or a
                                                                                                 // FFmpegProbeResult
-                .disableAudio().addExtraArgs("-t", "1", "-c:v", "copy").done();
+                .disableAudio().addExtraArgs("-t", "1", "-c", "copy").done();
         executor.createJob(builder).run();
     }
 
@@ -109,7 +111,7 @@ public class FFMPEGService {
         for (String file : names) {
             builder.addInput(file + ".mp4");
         }
-        builder.addOutput(uploadDir + "/" + name).addExtraArgs("-filter_complex", "concat=n=10:v=1:a=0", "-y").done();
+        builder.addOutput(uploadDir + "/" + name).addExtraArgs("-filter_complex", "concat=n=8:v=1:a=0", "-y").done();
         executor.createJob(builder).run();
         for (String file : names) {
             try {
