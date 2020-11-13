@@ -128,7 +128,6 @@ public class FileController {
             // send a route that will delete file from DB and upload it
             // No checks like first time
             res.put("url", "/upload/video/replace/" + filePayload.get().get_id());
-            return res;
 
         } else {
             // Check File in drive if not upload
