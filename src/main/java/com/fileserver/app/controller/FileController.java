@@ -4,12 +4,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ForkJoinPool;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
-import com.fileserver.app.config.JaxbForkJoinWorkerThreadFactory;
 import com.fileserver.app.dao.file.FileInterface;
 import com.fileserver.app.dao.user.UserRolesInterface;
 import com.fileserver.app.entity.file.File;
@@ -64,6 +62,7 @@ public class FileController {
     private String videoType = "video/";
     private String fnv = "File is not type of video";
     private String originHeader = "origin";
+    private String fns = "file not saved in db";
 
     @PostMapping("/upload/video/async")
     public CompletableFuture<Object> uploadFileAsync(@RequestParam("file") MultipartFile file,
@@ -91,7 +90,7 @@ public class FileController {
             fileModel.setType(contentType);
             fileModel.setSize(file.getSize());
             fileModel.setOrigin(origin);
-            fileModel = fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException("file not saved in db"));
+            fileModel = fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));
         } else {
             fileModel = isFile.get();
             if (!fileService.exists(fileModel.getName())) {
@@ -194,7 +193,6 @@ public class FileController {
             throw new NotFoundException(fnf);
         }
         String contentType = file.getContentType();
-        String name = file.getOriginalFilename();
         if (contentType == null || !contentType.startsWith(videoType)) {
             throw new NotSupportedException(fnv);
         }
@@ -202,12 +200,15 @@ public class FileController {
         Optional<File> isFile = fileInterface.removeById(id);
         if (!isFile.isPresent())
             throw new NotSupportedException("cannot replace file not found");
+
         File fileModel = isFile.get();
+        String name = fileModel.getName();
+
 
         CompletableFuture.runAsync(() -> {
-            fileService.remove(fileModel.getName());
-            awsUploadService.remove(bucket, fileModel.getName());
-            Optional<File> preview = fileInterface.removeChild(fileModel.getName(), contentType);
+            fileService.remove(name);
+            awsUploadService.remove(bucket, name);
+            Optional<File> preview = fileInterface.removeChild(name, contentType);
             if (preview.isPresent()) {
                 fileService.remove(preview.get().getName());
                 awsUploadService.remove(bucket, preview.get().getName());
@@ -219,14 +220,19 @@ public class FileController {
         fileModel.setType(contentType);
         fileModel.setSize(file.getSize());
         fileModel.setOrigin(origin);
-        fileInterface.add(fileModel); // save file
+        fileModel = fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));
 
+        final boolean is_uploaded = fileModel.isUploaded();
         return CompletableFuture.supplyAsync(() -> {
-            awsUploadService.multipartUploadSync(bucket, name, contentType);
-            Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
-            preview(fm.get());
-            return fm.get();
-        }, getJaxbExecutor());
+            if (!is_uploaded) {
+                awsUploadService.multipartUploadSync(bucket, name, contentType);
+                Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
+                preview(fm.get());
+                return fm.get();
+            } else {
+                return fileInterface.getByName(name).get();
+            }
+        });
     }
 
     @PostMapping("/clip-test")
@@ -276,12 +282,5 @@ public class FileController {
             fileInterface.updateByName(d.getName(), completed, isCompleted);
         }
         return d;
-    }
-
-
-    private ForkJoinPool getJaxbExecutor() {
-        JaxbForkJoinWorkerThreadFactory threadFactory = new JaxbForkJoinWorkerThreadFactory();
-        int parallelism = Math.min(0x7fff /* copied from ForkJoinPool.java */, Runtime.getRuntime().availableProcessors());
-        return new ForkJoinPool(parallelism, threadFactory, null, false);
     }
 }

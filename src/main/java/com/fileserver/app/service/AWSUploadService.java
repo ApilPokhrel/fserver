@@ -125,7 +125,6 @@ public class AWSUploadService {
     }
 
     public void multipartUploadSync(String bucketName, String keyName, String contentType) {
-        System.out.println(bucketName+" "+keyName+" "+contentType);
         Regions clientRegion = Regions.US_EAST_2;
         String filePath = uploadDir;
 
