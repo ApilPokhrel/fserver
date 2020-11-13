@@ -201,20 +201,14 @@ public class FileController {
         if (!isFile.isPresent())
             throw new NotSupportedException("cannot replace file not found");
 
-        fileService.uploadFile(file); // upload file
         File fileModel = isFile.get();
         String name = fileModel.getName();
 
+        //remove
+        removeFile(name, contentType);
+        //
 
-        CompletableFuture.runAsync(() -> {
-            fileService.remove(name);
-            awsUploadService.remove(bucket, name);
-            Optional<File> preview = fileInterface.removeChild(name, contentType);
-            if (preview.isPresent()) {
-                fileService.remove(preview.get().getName());
-                awsUploadService.remove(bucket, preview.get().getName());
-            }
-        });
+        fileService.uploadFile(file); // upload file
 
         String origin = request.getHeader(originHeader);
         fileModel.setName(name);
@@ -286,5 +280,15 @@ public class FileController {
             fileInterface.updateByName(d.getName(), completed, isCompleted);
         }
         return d;
+    }
+
+    private void removeFile(String name, String contentType){
+        fileService.remove(name);
+        awsUploadService.remove(bucket, name);
+        Optional<File> preview = fileInterface.removeChild(name, contentType);
+        if (preview.isPresent()) {
+            fileService.remove(preview.get().getName());
+            awsUploadService.remove(bucket, preview.get().getName());
+        }
     }
 }
