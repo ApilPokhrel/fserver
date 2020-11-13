@@ -75,14 +75,14 @@ public class FFMPEGService {
         double step = ((duration - 10) / 10);
 
         double one = step;
-        double two = step+one;
-        double three = step+two;
-        double four = step+three;
-        double five = step+four;
-        double six = step+five;
-        double seven = step+six;
-        double eight = step+seven;
-        double nine = step+eight;
+        double two = step + one;
+        double three = step + two;
+        double four = step + three;
+        double five = step + four;
+        double six = step + five;
+        double seven = step + six;
+        double eight = step + seven;
+        double nine = step + eight;
 
         dd[0] = two;
         dd[1] = three;
@@ -97,11 +97,11 @@ public class FFMPEGService {
 
     private void generateClip(String filename, double d, String name) {
         FFmpegExecutor executor = new FFmpegExecutor(this.ffmpeg, this.ffprobe);
-
         FFmpegBuilder builder = new FFmpegBuilder().setStartOffset((long) d, TimeUnit.SECONDS) // offset -ss 00:03
-                .setInput(uploadDir + "/" + filename).addOutput(uploadDir + "/" + name + ".mp4")// Filename, or a
-                                                                                                // FFmpegProbeResult
-                .disableAudio().addExtraArgs("-t", "1", "-c", "copy").done();
+                .addInput(uploadDir + "/" + filename).addOutput(uploadDir + "/" + name + ".mp4")// Filename, or a
+                .disableAudio()
+                .disableSubtitle()
+                .addExtraArgs("-t", "1", "-c", "copy").done();
         executor.createJob(builder).run();
     }
 
@@ -125,7 +125,7 @@ public class FFMPEGService {
     private void combineClipsDemuxer(List<String> names, String name) {
         FFmpegExecutor executor = new FFmpegExecutor(this.ffmpeg, this.ffprobe);
         FFmpegBuilder builder = new FFmpegBuilder();
-        String concatTxt = uploadDir+"/"+"concat.txt";
+        String concatTxt = uploadDir + "/" + "concat.txt";
         try {
             Files.deleteIfExists(Paths.get(concatTxt));
         } catch (IOException e) {
