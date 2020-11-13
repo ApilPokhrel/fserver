@@ -155,7 +155,7 @@ public class FileController {
         }
         String contentType = file.getContentType();
         String name = file.getOriginalFilename();
-        if (contentType != null && !contentType.startsWith("video/")) {
+        if (contentType == null || !contentType.startsWith("video/")) {
             throw new NotSupportedException("File is not type of video");
         }
 
@@ -199,7 +199,7 @@ public class FileController {
         }
         String contentType = file.getContentType();
         String name = file.getOriginalFilename();
-        if (contentType != null && !contentType.startsWith(videoType)) {
+        if (contentType == null || !contentType.startsWith(videoType)) {
             throw new NotSupportedException(fnv);
         }
 
