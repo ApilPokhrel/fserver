@@ -272,7 +272,7 @@ public class FileController {
         }
 
         if (!previewModel.isUploaded()) {
-            awsUploadService.upload("nomore", previewModel.getName(), "video/mp4"); // db store preview uploaded
+            awsUploadService.upload(bucket, previewModel.getName(), "video/mp4"); // db store preview uploaded
             fileInterface.updateByName(previewModel.getName(), uploaded, true);
             boolean isCompleted = fileService.remove(previewModel.getName());
             fileInterface.updateByName(previewModel.getName(), completed, isCompleted);
