@@ -110,7 +110,7 @@ public class FFMPEGService {
         for (String file : names) {
             builder.addInput(file + ".mp4");
         }
-        builder.addOutput(uploadDir + "/" + name).addExtraArgs("-filter_complex", "concat=n=8:v=1:a=0", "-y").done();
+        builder.addOutput(uploadDir + "/" + name).addExtraArgs("-filter_complex", "concat=n=9:v=1:a=0", "-y").done();
         executor.createJob(builder).run();
         for (String file : names) {
             try {
