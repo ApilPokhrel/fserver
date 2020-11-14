@@ -90,7 +90,7 @@ public class FFMPEGService {
         dd[5] = seven;
         dd[6] = eight;
         dd[7] = nine;
-        dd[8] = duration - 30;
+        dd[8] = duration - 35;
         return dd;
     }
 
