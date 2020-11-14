@@ -61,13 +61,12 @@ public class FFMPEGService {
 
         String preview = filename.replace(".mp4", "") + "_preview.mp4";
         combineClips(clips, preview);
-        // combineClipsDemuxer(clips, preview);
         return preview;
     }
 
     // 10 min clip
     private double[] generateClipTimes(double duration) {
-        double[] dd = new double[8];
+        double[] dd = new double[9];
         if (duration < 10d) {
             return new double[0];
         }
@@ -83,7 +82,6 @@ public class FFMPEGService {
         double seven = step + six;
         double eight = step + seven;
         double nine = step + eight;
-
         dd[0] = two;
         dd[1] = three;
         dd[2] = four;
@@ -92,6 +90,7 @@ public class FFMPEGService {
         dd[5] = seven;
         dd[6] = eight;
         dd[7] = nine;
+        dd[8] = duration - 30;
         return dd;
     }
 
@@ -122,7 +121,7 @@ public class FFMPEGService {
         }
     }
 
-    private void combineClipsDemuxer(List<String> names, String name) {
+    public void combineClipsDemuxer(List<String> names, String name) {
         FFmpegExecutor executor = new FFmpegExecutor(this.ffmpeg, this.ffprobe);
         FFmpegBuilder builder = new FFmpegBuilder();
         String concatTxt = uploadDir + "/" + "concat.txt";
