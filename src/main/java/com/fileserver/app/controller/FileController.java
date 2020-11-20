@@ -59,60 +59,11 @@ public class FileController {
     }
 
     private String fnf = "file not found";
-    private String videoType = "video/";
+    private String videoType = "video/mp4";
+    private String type = "video/";
     private String fnv = "File is not type of video";
     private String originHeader = "origin";
     private String fns = "file not saved in db";
-
-    @PostMapping("/upload/video/async")
-    public CompletableFuture<Object> uploadFileAsync(@RequestParam("file") MultipartFile file,
-            HttpServletRequest request) {
-        if (file == null) {
-            throw new NotFoundException(fnf);
-        }
-        String contentType = file.getContentType();
-        String name = file.getOriginalFilename();
-        if (contentType != null && !contentType.startsWith(videoType)) {
-            throw new NotSupportedException(fnv);
-        }
-
-        // File upload first
-        // Parallel -> Upload to AWS, Create a preview
-        // After preview -> upload preview to aws
-
-        File fileModel = new File();
-
-        Optional<File> isFile = fileInterface.getByName(name);
-        if (!isFile.isPresent()) {
-            fileService.uploadFile(file); // after this
-            String origin = request.getHeader(originHeader);
-            fileModel.setName(name);
-            fileModel.setType(contentType);
-            fileModel.setSize(file.getSize());
-            fileModel.setOrigin(origin);
-            fileModel = fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));
-        } else {
-            fileModel = isFile.get();
-            if (!fileService.exists(fileModel.getName())) {
-                fileService.uploadFile(file); // if not in directory upload file
-                fileInterface.updateByName(fileModel.getName(), uploaded, false);
-                fileInterface.updateByName(fileModel.getName(), completed, false);
-            }
-        }
-        final boolean is_uploaded = fileModel.isUploaded();
-        return CompletableFuture.supplyAsync(() -> {
-            if (!is_uploaded) {
-                return awsUploadService.multipartUploadAsync(bucket, name, contentType).thenApplyAsync(f -> {
-                    Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
-                    preview(fm.get());
-                    return fm.get();
-                });
-
-            } else {
-                return fileInterface.getByName(name).get();
-            }
-        });
-    }
 
     // replace or not checking route should be different
     // check (name, replace) -> token, url, file
@@ -126,14 +77,12 @@ public class FileController {
         Optional<File> filePayload = fileInterface.getByName(body.getName());
         Map<String, Object> res = new HashMap<>();
         if (filePayload.isPresent() && body.isReplace()) {
-            // send a route that will delete file from DB and upload it
-            // No checks like first time
             res.put("url", "/upload/video/replace/" + filePayload.get().get_id());
-
-        } else {
-            // Check File in drive if not upload
-            // Check Uploaded if not upload
-            // Check Completed if not complete
+            res.put("file", filePayload.get());
+        } else if(filePayload.isPresent() && body.isPreview()){
+            res.put("url", "/upload/video/preview");
+            res.put("file", filePayload.get());
+        }  else {
             res.put("url", "/upload/video");
         }
         res.put("user", user);
@@ -146,44 +95,38 @@ public class FileController {
     public CompletableFuture<File> uploadFileSync(@RequestParam("file") MultipartFile file,
             HttpServletRequest request) {
         if (file == null) {
-            throw new NotFoundException("file not found");
+            throw new NotFoundException(fnf);
         }
         String contentType = file.getContentType();
         String name = file.getOriginalFilename();
-        if (contentType == null || !contentType.startsWith("video/")) {
-            throw new NotSupportedException("File is not type of video");
+        if (contentType == null || !contentType.startsWith(type)) {
+            throw new NotSupportedException(fnv);
         }
 
-        File fileModel = new File();
+        File fileModel;
 
         Optional<File> isFile = fileInterface.getByName(name);
-        if (!isFile.isPresent()) {
-            fileService.uploadFile(file); // after this
-            String origin = request.getHeader("origin");
-            fileModel.setName(name);
-            fileModel.setType(contentType);
-            fileModel.setSize(file.getSize());
-            fileModel.setOrigin(origin);
-            fileModel = fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException("file not saved in db"));
-        } else {
+        if (!isFile.isPresent()) { // not present
+            fileModel = saveVideo(file, request.getHeader(originHeader));
+        } else { // present
             fileModel = isFile.get();
-            if (!fileService.exists(fileModel.getName())) {
-                fileService.uploadFile(file); // if not in directory upload file
-                fileInterface.updateByName(fileModel.getName(), uploaded, false);
-                fileInterface.updateByName(fileModel.getName(), completed, false);
+            if (!fileService.exists(fileModel.getName())) { // exists in storage or not
+                fileService.uploadFile(file); // if not in directory save in storage
+                fileModel = fileInterface.updateStatus(fileModel.getName(), false, false).orElseThrow();
             }
         }
+
         final boolean is_uploaded = fileModel.isUploaded();
-        return CompletableFuture.supplyAsync(() -> {
-            if (!is_uploaded) {
-                awsUploadService.multipartUploadSync(bucket, name, contentType);
-                Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
-                preview(fm.get());
-                return fm.get();
-            } else {
-                return fileInterface.getByName(name).get();
-            }
+        CompletableFuture<File> toAws = CompletableFuture.supplyAsync(() -> {
+            if (!is_uploaded)
+                return upload(name, contentType);
+            else
+                return fileInterface.getByName(name).orElseThrow();
         });
+
+        CompletableFuture<File> toPreview = CompletableFuture.supplyAsync(() -> preview(name, contentType));
+
+        return toAws.thenCombine(toPreview, (aws, prev) -> removeFile(name));
     }
 
     @PostMapping("/upload/video/replace/{id}")
@@ -193,7 +136,7 @@ public class FileController {
             throw new NotFoundException(fnf);
         }
         String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith(videoType)) {
+        if (contentType == null || !contentType.startsWith(type)) {
             throw new NotSupportedException(fnv);
         }
 
@@ -204,33 +147,24 @@ public class FileController {
         File fileModel = isFile.get();
         String name = fileModel.getName();
 
-        //remove
         removeFile(name, contentType);
-        //
 
-        fileService.uploadFile(file); // upload file
+        fileService.uploadFile(file);
 
         String origin = request.getHeader(originHeader);
-        fileModel.setName(name);
-        fileModel.setType(contentType);
-        fileModel.setSize(file.getSize());
-        fileModel.setOrigin(origin);
-        fileModel.setUploaded(false);
-        fileModel.setCompleted(false);
-        fileModel.setProcessed(false);
-        fileModel = fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));
+        fileModel = saveVideo(file, origin);
 
         final boolean is_uploaded = fileModel.isUploaded();
-        return CompletableFuture.supplyAsync(() -> {
-            if (!is_uploaded) {
-                awsUploadService.multipartUploadSync(bucket, name, contentType);
-                Optional<File> fm = fileInterface.updateByName(name, uploaded, true);
-                preview(fm.get());
-                return fm.get();
-            } else {
-                return fileInterface.getByName(name).get();
-            }
+        CompletableFuture<File> toAws = CompletableFuture.supplyAsync(() -> {
+            if (!is_uploaded)
+                return upload(name, contentType);
+            else
+                return fileInterface.getByName(name).orElseThrow();
         });
+
+        CompletableFuture<File> toPreview = CompletableFuture.supplyAsync(() -> preview(name, contentType));
+
+        return toAws.thenCombine(toPreview, (aws, prev) -> removeFile(name));
     }
 
     @PostMapping("/clip-test")
@@ -245,44 +179,24 @@ public class FileController {
         return true;
     }
 
-    private File preview(File d) {
-        Optional<File> isPreview = fileInterface.incompleted(d.getName());
-        File previewModel = new File();
-        if (!isPreview.isPresent()) {
-            String preview = ffmpegService.createPreview(d.getName()); // db store preview created
-            previewModel.setName(preview);
-            previewModel.setType(d.getType());
-            previewModel.setParent(d.getName());
-            previewModel.set_parent(false);
-            previewModel = fileInterface.add(previewModel)
-                    .orElseThrow(() -> new NotFoundException("sub-file not saved in db"));
-        } else {
+    private File preview(String filename, String type) {// if video file is pr
+        Optional<File> isPreview = fileInterface.incompleted(filename);
+        File previewModel;
+        if (isPreview.isPresent() && fileService.exists(isPreview.get().getName())) {
             previewModel = isPreview.get();
-            if (!fileService.exists(previewModel.getName())) {
-                ffmpegService.createPreview(d.getName()); // if not in directory upload file
-                fileInterface.updateByName(previewModel.getName(), uploaded, false);
-                fileInterface.updateByName(previewModel.getName(), completed, false);
+            if (!previewModel.isUploaded()) {
+                uploadPreview(previewModel.getName());
             }
+        } else {
+            if (isPreview.isPresent())
+                fileInterface.removeById(isPreview.get().get_id());
+            previewModel = savePreview(filename, type);
+            uploadPreview(previewModel.getName());
         }
-
-        if (!previewModel.isUploaded()) {
-            awsUploadService.upload(bucket, previewModel.getName(), "video/mp4"); // db store preview uploaded
-            fileInterface.updateByName(previewModel.getName(), uploaded, true);
-            boolean isCompleted = fileService.remove(previewModel.getName());
-            fileInterface.updateByName(previewModel.getName(), completed, isCompleted);
-        } else if (!previewModel.isCompleted()) {
-            boolean isCompleted = fileService.remove(previewModel.getName());
-            fileInterface.updateByName(previewModel.getName(), completed, isCompleted);
-        }
-
-        if (!d.isCompleted()) {
-            boolean isCompleted = fileService.remove(d.getName());
-            fileInterface.updateByName(d.getName(), completed, isCompleted);
-        }
-        return d;
+        return removePreview(previewModel.getName());
     }
 
-    private void removeFile(String name, String contentType){
+    private void removeFile(String name, String contentType) {
         fileService.remove(name);
         awsUploadService.remove(bucket, name);
         Optional<File> preview = fileInterface.removeChild(name, contentType);
@@ -291,4 +205,84 @@ public class FileController {
             awsUploadService.remove(bucket, preview.get().getName());
         }
     }
+
+    // Chunk the upload
+    // login -> check name , replace
+    // -> created, uploaded, processed, completed
+    // -> created, uploaded, processed, completed (is_parent = false)
+
+    // 1.created
+    // -> save file to storage, create file in db
+    // -> upload to aws, update uploaded to true db
+    // -> generate preview, create preview file in db with parent
+    // -> upload preview to aws, update preview uploaded to true
+    // -> delete preview from storage, update preview completed to true in db
+    // -> delete file from storage, update completed to true in db
+
+    private File saveVideo(MultipartFile file, String origin) {
+        if (file == null) {
+            throw new NotFoundException(fnf);
+        }
+        String contentType = file.getContentType();
+        String name = file.getOriginalFilename();
+        if (contentType == null || !contentType.startsWith(type)) {
+            throw new NotSupportedException(fnv);
+        }
+
+        File fileModel = new File();
+        fileService.uploadFile(file); // after this
+        fileModel.setName(name);
+        fileModel.setType(contentType);
+        fileModel.setSize(file.getSize());
+        fileModel.setOrigin(origin);
+        return fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));
+    }
+
+    @PostMapping("/upload/video/preview")
+    public File previewUpload(@RequestBody Map<String, String> body) {
+        String name = body.get("name");
+        String contentType = body.get("type");
+        if(!fileService.exists(name)){
+            boolean ex = awsUploadService.downloadFile(bucket, name);
+            if(!ex) throw new NotFoundException("file not found in cloud");
+        }
+        File prev = preview(name, contentType);
+        removeFile(name);
+        return prev;
+    }
+
+    private File upload(String name, String contentType) {
+        awsUploadService.multipartUploadSync(bucket, name, contentType);
+        return fileInterface.updateStatus(name, true, false)
+                .orElseThrow(() -> new NotFoundException("file not updated while upload"));
+    }
+
+    private File savePreview(String fileName, String fileType) {
+        File previewModel = new File();
+        String preview = ffmpegService.createPreview(fileName); // db store preview created
+        previewModel.setName(preview);
+        previewModel.setType(fileType);
+        previewModel.setParent(fileName);
+        previewModel.set_parent(false);
+        return fileInterface.add(previewModel).orElseThrow(() -> new NotFoundException("preview not saved in db"));
+    }
+
+    private File uploadPreview(String preview) {
+        awsUploadService.upload(bucket, preview, videoType); // db store preview uploaded
+        return fileInterface.updateStatus(preview, true, false)
+                .orElseThrow(() -> new NotFoundException("preview not updated while uploading"));
+    }
+
+    private File removePreview(String preview) {
+        boolean isCompleted = fileService.remove(preview);
+        return fileInterface.updateByName(preview, completed, isCompleted)
+                .orElseThrow(() -> new NotSupportedException("preview not removed"));
+    }
+
+    private File removeFile(String name) {
+        boolean isCompleted = fileService.remove(name);
+        return fileInterface.updateByName(name, completed, isCompleted)
+                .orElseThrow(() -> new NotSupportedException("file not removed"));
+    }
+
 }

@@ -13,6 +13,7 @@ public interface FileInterface {
     Optional<File> getById(String id);
     Optional<File> getByName(String name);
     Optional<File> updateByName(String name, String key, Object value);
+    Optional<File> updateStatus(String name, boolean uploaded, boolean completed);
     List<File> incompletes(boolean isParent);
     Optional<File> incompleted(String parent);
     Optional<File> removeByName(String name);

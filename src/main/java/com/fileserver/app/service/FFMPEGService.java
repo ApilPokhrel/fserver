@@ -1,6 +1,7 @@
 package com.fileserver.app.service;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -56,13 +57,14 @@ public class FFMPEGService {
         for (double d : dd) {
             String name = RandomStringUtils.randomAlphanumeric(10); // name of clip
             generateClip(filename, d, name);
-            clips.add(uploadDir + "/" + name);
+            clips.add(uploadDir + "/preview/" + name);
         }
 
         String preview = filename.replace(".mp4", "") + "_preview.mp4";
-        combineClips(clips, preview);
+        combineClipsDemuxer(clips, preview);
         return preview;
     }
+
 
     // 10 min clip
     private double[] generateClipTimes(double duration) {
@@ -95,20 +97,22 @@ public class FFMPEGService {
     }
 
     private void generateClip(String filename, double d, String name) {
+
         FFmpegExecutor executor = new FFmpegExecutor(this.ffmpeg, this.ffprobe);
-        FFmpegBuilder builder = new FFmpegBuilder().setStartOffset((long) d, TimeUnit.SECONDS) // offset -ss 00:03
-                .addInput(uploadDir + "/" + filename).addOutput(uploadDir + "/" + name + ".mp4")// Filename, or a
-                .disableAudio()
-                .disableSubtitle()
-                .addExtraArgs("-t", "1", "-c", "copy").done();
+        FFmpegBuilder builder = new FFmpegBuilder().setStartOffset((long) d, TimeUnit.SECONDS) // offset -ss 00:01
+                .addInput(uploadDir + "/" + filename).addOutput(uploadDir + "/preview/" + name + ".mp4")// Filename,
+                .disableAudio().addExtraArgs("-t", "1").done();
         executor.createJob(builder).run();
+
     }
 
-    private void combineClips(List<String> names, String name) {
+    public void combineClips(List<String> names, String name) {
         FFmpegExecutor executor = new FFmpegExecutor(this.ffmpeg, this.ffprobe);
         FFmpegBuilder builder = new FFmpegBuilder();
         for (String file : names) {
-            builder.addInput(file + ".mp4");
+            File f = new File(file + ".mp4");
+            if (f.exists())
+                builder.addInput(file + ".mp4");
         }
         builder.addOutput(uploadDir + "/" + name).addExtraArgs("-filter_complex", "concat=n=9:v=1:a=0", "-y").done();
         executor.createJob(builder).run();

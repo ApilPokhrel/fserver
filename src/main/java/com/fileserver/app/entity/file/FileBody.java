@@ -17,4 +17,5 @@ public @Data class FileBody {
     @Min(100)
     private long exp = SecurityConstants.EXPIRATION_TIME;
     private boolean replace = false;
+    private boolean preview = false;
 }

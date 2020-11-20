@@ -87,4 +87,13 @@ public class FileImpl implements FileInterface {
         Query query = new Query(Criteria.where("parent").is(parent).and(is_parent).is(true).and("type").is(type));
         return Optional.ofNullable(mTemplate.findAndRemove(query, File.class));
     }
+
+    @Override
+    public Optional<File> updateStatus(String name, boolean uploaded, boolean completed) {
+        Query query = new Query(Criteria.where("name").is(name));
+        Update update = new Update().set("uploaded", uploaded);
+        update.set("completed", completed);
+        FindAndModifyOptions options = new FindAndModifyOptions().returnNew(true);
+        return Optional.ofNullable(mTemplate.findAndModify(query, update, options, File.class));
+    }
 }
