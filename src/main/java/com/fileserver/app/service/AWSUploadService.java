@@ -219,7 +219,7 @@ public class AWSUploadService {
         }
     }
 
-    public boolean downloadFile(String bucketName, String fileName) {
+    public File downloadFile(String bucketName, String fileName) {
         Regions clientRegion = Regions.US_EAST_2;
         String filePath = uploadDir;
         try {
@@ -243,16 +243,14 @@ public class AWSUploadService {
                 writer.flush();
                 reader.close();
             }
-
-            return localFile.exists() && localFile.canRead();
-
+            return localFile;
         } catch (AmazonServiceException e) {
             throw new AWSUploadException(e.getErrorMessage());
         } catch (SdkClientException ex) {
             ex.printStackTrace();
             throw new AWSUploadException(ex.getLocalizedMessage());
         } catch (IOException e) {
-            return false;
+            return null;
         }
     }
 

@@ -79,10 +79,17 @@ public class FileController {
         if (filePayload.isPresent() && body.isReplace()) {
             res.put("url", "/upload/video/replace/" + filePayload.get().get_id());
             res.put("file", filePayload.get());
-        } else if(filePayload.isPresent() && body.isPreview()){
+        } else if (body.isPreview()) {
             res.put("url", "/upload/video/preview");
-            res.put("file", filePayload.get());
-        }  else {
+            if (filePayload.isPresent()) {
+                res.put("file", filePayload.get());
+            } else {
+                File file = new File();
+                file.setName(body.getName());
+                file.setType("video/mp4");
+                res.put("file", file);
+            }
+        } else {
             res.put("url", "/upload/video");
         }
         res.put("user", user);
@@ -242,9 +249,21 @@ public class FileController {
     public File previewUpload(@RequestBody Map<String, String> body) {
         String name = body.get("name");
         String contentType = body.get("type");
-        if(!fileService.exists(name)){
-            boolean ex = awsUploadService.downloadFile(bucket, name);
-            if(!ex) throw new NotFoundException("file not found in cloud");
+        if (!fileService.exists(name)) {
+            java.io.File file = awsUploadService.downloadFile(bucket, name);
+            boolean ex = file != null && file.exists() && file.canRead();
+            if (!ex)
+                throw new NotFoundException("file not found in cloud");
+
+            Optional<File> filePayload = fileInterface.getByName(name);
+            if (!filePayload.isPresent()) {
+                File fileModel = new File();
+                fileModel.setName(name);
+                fileModel.setType(contentType);
+                fileModel.setSize(file.length());
+                fileModel.setOrigin("cloud");
+                fileInterface.add(fileModel);
+            }
         }
         File prev = preview(name, contentType);
         removeFile(name);
