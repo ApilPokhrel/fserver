@@ -3,7 +3,8 @@ package com.fileserver.app.dao.file;
 import java.util.List;
 import java.util.Optional;
 
-import com.fileserver.app.entity.file.File;
+import com.fileserver.app.entity.file.FileModel;
+import com.fileserver.app.entity.file.SubTypeEnum;
 
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,77 +24,87 @@ public class FileImpl implements FileInterface {
     private String is_parent = "is_parent";
 
     @Override
-    public Optional<File> add(File file) {
+    public Optional<FileModel> add(FileModel file) {
         return Optional.ofNullable(mTemplate.save(file));
     }
 
     @Override
-    public Optional<File> getById(String id) {
-        return Optional.ofNullable(mTemplate.findById(id, File.class));
+    public Optional<FileModel> getById(String id) {
+        return Optional.ofNullable(mTemplate.findById(id, FileModel.class));
     }
 
     @Override
-    public List<File> incompletes(boolean isParent) {
-        Query query = new Query(Criteria.where(is_parent).is(isParent).and("completed").is(false));
-        return mTemplate.find(query, File.class);
-    }
-
-    @Override
-    public Optional<File> getByName(String name) {
+    public Optional<FileModel> getByName(String name) {
         Query query = new Query(Criteria.where("name").is(name));
-        return Optional.ofNullable(mTemplate.findOne(query, File.class));
+        return Optional.ofNullable(mTemplate.findOne(query, FileModel.class));
     }
 
     @Override
-    public Optional<File> updateByName(String name, String key, Object value) {
+    public Optional<FileModel> updateByName(String name, String key, Object value) {
         Query query = new Query(Criteria.where("name").is(name));
         Update update = new Update().set(key, value);
         FindAndModifyOptions options = new FindAndModifyOptions().returnNew(true);
-        return Optional.ofNullable(mTemplate.findAndModify(query, update, options, File.class));
+        return Optional.ofNullable(mTemplate.findAndModify(query, update, options, FileModel.class));
     }
 
     @Override
-    public Optional<File> removeByName(String name) {
+    public Optional<FileModel> removeByName(String name) {
         Query query = new Query(Criteria.where("name").is(name));
-        return Optional.ofNullable(mTemplate.findAndRemove(query, File.class));
+        return Optional.ofNullable(mTemplate.findAndRemove(query, FileModel.class));
     }
 
     @Override
-    public Optional<File> removeById(String id) {
+    public Optional<FileModel> removeById(String id) {
         Query query = new Query(Criteria.where("_id").is(new ObjectId(id)));
-        return Optional.ofNullable(mTemplate.findAndRemove(query, File.class));
+        return Optional.ofNullable(mTemplate.findAndRemove(query, FileModel.class));
     }
 
     @Override
-    public Optional<File> incompleted(String parent) {
-        Query query = new Query(Criteria.where(is_parent).is(false).and("parent").is(parent));
-        return Optional.ofNullable(mTemplate.findOne(query, File.class));
-    }
-
-    @Override
-    public Optional<File> getOne(String field, String value) {
+    public Optional<FileModel> getOne(String field, String value) {
         Query query = new Query(Criteria.where(field).is(value));
-        return Optional.ofNullable(mTemplate.findOne(query, File.class));
+        return Optional.ofNullable(mTemplate.findOne(query, FileModel.class));
     }
 
     @Override
-    public Optional<File> removeOne(String field, String value) {
+    public Optional<FileModel> removeOne(String field, String value) {
         Query query = new Query(Criteria.where(field).is(value));
-        return Optional.ofNullable(mTemplate.findAndRemove(query, File.class));
+        return Optional.ofNullable(mTemplate.findAndRemove(query, FileModel.class));
     }
 
     @Override
-    public Optional<File> removeChild(String parent, String type) {
-        Query query = new Query(Criteria.where("parent").is(parent).and(is_parent).is(true).and("type").is(type));
-        return Optional.ofNullable(mTemplate.findAndRemove(query, File.class));
+    public Optional<FileModel> removeChild(String parent, String type) {
+        Query query = new Query(Criteria.where("parent").is(parent).and(is_parent).is(true).and("mimeType").is(type));
+        return Optional.ofNullable(mTemplate.findAndRemove(query, FileModel.class));
     }
 
     @Override
-    public Optional<File> updateStatus(String name, boolean uploaded, boolean completed) {
+    public Optional<FileModel> updateStatus(String name, boolean uploaded, boolean completed) {
         Query query = new Query(Criteria.where("name").is(name));
         Update update = new Update().set("uploaded", uploaded);
         update.set("completed", completed);
         FindAndModifyOptions options = new FindAndModifyOptions().returnNew(true);
-        return Optional.ofNullable(mTemplate.findAndModify(query, update, options, File.class));
+        return Optional.ofNullable(mTemplate.findAndModify(query, update, options, FileModel.class));
+    }
+
+    @Override
+    public Optional<FileModel> subFile(String parentId, SubTypeEnum subType) {
+        Query query = new Query(Criteria.where("parent_id").is(new ObjectId(parentId))
+                .andOperator(Criteria.where("subType").is(subType)).andOperator(Criteria.where(is_parent).is(false)));
+        return Optional.ofNullable(mTemplate.findOne(query, FileModel.class));
+    }
+
+    @Override
+    public Optional<FileModel> updateById(String id, String key, Object value) {
+        Query query = new Query(Criteria.where("_id").is(new ObjectId(id)));
+        Update update = new Update().set(key, value);
+        FindAndModifyOptions options = new FindAndModifyOptions().returnNew(true);
+        return Optional.ofNullable(mTemplate.findAndModify(query, update, options, FileModel.class));
+    }
+
+    @Override
+    public List<FileModel> listSubFile(String parentId) {
+        Query query = new Query(Criteria.where("parent_id").is(new ObjectId(parentId))
+                .andOperator(Criteria.where(is_parent).is(false)));
+        return mTemplate.find(query, FileModel.class);
     }
 }

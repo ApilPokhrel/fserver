@@ -39,6 +39,10 @@ public class FileService {
         return file.getOriginalFilename();
     }
 
+    public File get(String name){
+        return new File(uploadDir + File.separator + StringUtils.cleanPath(name));
+    }
+
     public boolean remove(String name){
         try
         {
