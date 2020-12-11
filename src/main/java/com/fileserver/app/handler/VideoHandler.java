@@ -37,7 +37,7 @@ public class VideoHandler {
 
     public FileModel save(MultipartFile file, String origin, String name, String type, String uuid) {
         FileModel fileModel = new FileModel();
-        fileService.uploadFile(file); // after this
+        fileService.uploadFile(file, name); // after this
         fileModel.setName(name);
         fileModel.setMimeType(type);
         fileModel.setType(type);

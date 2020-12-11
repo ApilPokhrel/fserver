@@ -21,42 +21,37 @@ public class FileService {
     @Value("${app.upload.dir}")
     public String uploadDir;
 
-    public String uploadFile(MultipartFile file) {
+    public String uploadFile(MultipartFile file, String name) {
         try {
-            String name = file.getOriginalFilename();
-            if(name == null){
+            if (name.isBlank()) {
                 throw new NotFoundException("file not found");
             }
-            Path copyLocation = Paths
-                .get(uploadDir + File.separator + StringUtils.cleanPath(name));
+            Path copyLocation = Paths.get(uploadDir + File.separator + StringUtils.cleanPath(name));
             Files.copy(file.getInputStream(), copyLocation, StandardCopyOption.REPLACE_EXISTING);
 
         } catch (Exception e) {
             e.printStackTrace();
-            throw new FileStorageException("Could not store file " + file.getOriginalFilename()
-                + ". Please try again!");
+            throw new FileStorageException(
+                    "Could not store file " + file.getOriginalFilename() + ". Please try again!");
         }
         return file.getOriginalFilename();
     }
 
-    public File get(String name){
+    public File get(String name) {
         return new File(uploadDir + File.separator + StringUtils.cleanPath(name));
     }
 
-    public boolean remove(String name){
-        try
-        {
+    public boolean remove(String name) {
+        try {
             Files.deleteIfExists(Paths.get(uploadDir + File.separator + StringUtils.cleanPath(name)));
-        }
-        catch(IOException e)
-        {
+        } catch (IOException e) {
             return false;
         }
         return true;
     }
 
-    public boolean exists(String name){
-       File file = new File(uploadDir + File.separator + StringUtils.cleanPath(name));
-       return file.exists();
+    public boolean exists(String name) {
+        File file = new File(uploadDir + File.separator + StringUtils.cleanPath(name));
+        return file.exists();
     }
 }

@@ -87,6 +87,9 @@ public class PDFController {
                     result.setUrl("/pdf/process" + model.get_id());
                 } else if (!model.isCompleted()) {
                     result.setUrl("/pdf/complete" + model.get_id());
+                    result.setProcessed(true);
+                } else {
+                    result.setCompleted(true);
                 }
                 result.setFile(model);
                 result.setMethod("post");
@@ -116,8 +119,14 @@ public class PDFController {
 
     @PostMapping("/upload")
     public CompletableFuture<List<FileModel>> upload(@RequestParam("file") MultipartFile file,
-            HttpServletRequest request) {
-        FileModel model = save(file, request.getHeader(originHeader));
+            @RequestParam("key") String name, @RequestParam("contentType") String contentType,
+            @RequestParam("uuid") String uuid, HttpServletRequest request) {
+        if (name.isBlank())
+            throw new NotFoundException("name not found");
+
+        if (uuid.isBlank())
+            throw new NotFoundException("uuid not found");
+        FileModel model = save(file, request.getHeader(originHeader), name, contentType, uuid);
         return CompletableFuture.supplyAsync(() -> {
             List<FileModel> list = new ArrayList<>();
             File fle = fileService.get(model.getName());
@@ -132,11 +141,6 @@ public class PDFController {
                 remove(model.getName());
             return list;
         });
-    }
-
-    @PostMapping("/save")
-    public CompletableFuture<FileModel> save(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
-        return CompletableFuture.supplyAsync(() -> save(file, request.getHeader(originHeader)));
     }
 
     @PostMapping("/process/{id}")
@@ -195,7 +199,8 @@ public class PDFController {
 
         awsUploadService.remove(bucket, isFile.get().getName());
 
-        FileModel model = save(file, request.getHeader(originHeader));
+        FileModel model = save(file, request.getHeader(originHeader), isFile.get().getName(),
+                isFile.get().getMimeType(), isFile.get().getUuid());
         return CompletableFuture.supplyAsync(() -> {
             List<FileModel> list = new ArrayList<>();
             File fle = fileService.get(model.getName());
@@ -212,20 +217,20 @@ public class PDFController {
         });
     }
 
-    private FileModel save(MultipartFile file, String origin) {
+    private FileModel save(MultipartFile file, String origin, String name, String contentType, String uuid) {
         if (file == null) {
             throw new NotFoundException(fnf);
         }
-        String contentType = file.getContentType();
         if (contentType == null || !contentType.contains(type)) {
             throw new NotSupportedException(fnv);
         }
 
         FileModel fileModel = new FileModel();
-        String name = fileService.uploadFile(file); // after this
+        fileService.uploadFile(file, name); // after this
         fileModel.setName(name);
         fileModel.setType("pdf");
         fileModel.setMimeType(contentType);
+        fileModel.setUuid(uuid);
         fileModel.setSize(file.getSize());
         fileModel.setOrigin(origin);
         return fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));

@@ -13,4 +13,5 @@ public @Data class ResponseBody {
     private User user;
     private boolean completed = false;
     private boolean processed = false;
+
 }
