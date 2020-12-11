@@ -97,8 +97,9 @@ public class VideoController {
                 sb.append("/video/complete/" + model.get_id());
                 res.setMethod("post");
                 res.setMultipart(false);
+                res.setProcessed(true);
             } else {
-                throw new NotSupportedException("Upload Not Supported");
+                res.setCompleted(true);
             }
 
         } else if (body.isPreview()) {

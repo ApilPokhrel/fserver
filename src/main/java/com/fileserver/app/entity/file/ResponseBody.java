@@ -11,4 +11,6 @@ public @Data class ResponseBody {
     private boolean multipart = false;
     private String token;
     private User user;
+    private boolean completed = false;
+    private boolean processed = false;
 }
