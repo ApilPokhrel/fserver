@@ -35,14 +35,13 @@ public class VideoHandler {
     private String fns = "file not saved in db";
     private String bucket = "nomore";
 
-    public FileModel save(MultipartFile file, String origin) {
-        String contentType = file.getContentType();
-        String name = file.getOriginalFilename();
+    public FileModel save(MultipartFile file, String origin, String name, String type, String uuid) {
         FileModel fileModel = new FileModel();
         fileService.uploadFile(file); // after this
         fileModel.setName(name);
-        fileModel.setMimeType(contentType);
+        fileModel.setMimeType(type);
         fileModel.setType(type);
+        fileModel.setUuid(uuid);
         fileModel.setSize(file.getSize());
         fileModel.setOrigin(origin);
         return fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));

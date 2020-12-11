@@ -15,21 +15,13 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
-@EnableGlobalMethodSecurity(
-  prePostEnabled = true,
-  securedEnabled = true,
-  jsr250Enabled = true)
+@EnableGlobalMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
 
-  public class WebSecurity extends WebSecurityConfigurerAdapter {
-
+public class WebSecurity extends WebSecurityConfigurerAdapter {
 
     private static final String[] SWAGGER_URLS = {
-        // -- swagger ui
-        "/swagger-resources/**",
-        "/swagger-ui.html",
-        "/v2/api-docs",
-        "/webjars/**"
-        };
+            // -- swagger ui
+            "/swagger-resources/**", "/swagger-ui.html", "/v2/api-docs", "/webjars/**" };
 
     private UserDetailsService userDetailsService;
     private BCryptPasswordEncoder bCryptPasswordEncoder;
@@ -45,10 +37,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
                 .antMatchers(HttpMethod.POST, SecurityConstants.SIGN_UP_URL).permitAll()
                 .antMatchers(HttpMethod.POST, "/api/v1/user/login").permitAll()
                 .antMatchers(HttpMethod.POST, "/api/v1/file/login").permitAll()
-                .antMatchers(HttpMethod.POST, "/api/v1/role/").permitAll()
-                .antMatchers(SWAGGER_URLS).permitAll()
-                .anyRequest().authenticated()
-                .and()
+                .antMatchers(HttpMethod.POST, "/api/v1/video/login").permitAll()
+                .antMatchers(HttpMethod.POST, "/api/v1/pdf/login").permitAll()
+                .antMatchers(HttpMethod.POST, "/api/v1/role/").permitAll().antMatchers(SWAGGER_URLS).permitAll()
+                .anyRequest().authenticated().and()
                 // .addFilter(new JWTAuthenticationFilter(authenticationManager()))
                 .addFilter(new JWTAuthorizationFilter(authenticationManager()))
                 // this disables session creation on Spring Security

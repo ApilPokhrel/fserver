@@ -73,8 +73,8 @@ public class VideoController {
 
         if (fOptional.isPresent()) {
             FileModel model = fOptional.get();
-            if (!model.getUuid().equals(body.getUuid()))
-                throw new NotSupportedException("file name already taken");
+            if (model.getUuid() == null || !model.getUuid().equals(body.getUuid()))
+                throw new NotSupportedException("invalid owner");
 
             boolean exists = fileService.exists(body.getName());
             if (body.isPreview() && exists) {
@@ -97,6 +97,8 @@ public class VideoController {
                 sb.append("/video/complete/" + model.get_id());
                 res.setMethod("post");
                 res.setMultipart(false);
+            } else {
+                throw new NotSupportedException("Upload Not Supported");
             }
 
         } else if (body.isPreview()) {
@@ -109,6 +111,7 @@ public class VideoController {
             sb.append("/video/upload");
             sb.append("?key=" + body.getName());
             sb.append("&contentType=" + body.getContentType());
+            sb.append("&uuid=" + body.getUuid());
             res.setMethod("post");
             res.setMultipart(true);
         }
@@ -122,15 +125,20 @@ public class VideoController {
     @PostMapping("/upload")
     public CompletableFuture<FileModel> uploadFileSync(@RequestParam("file") MultipartFile file,
             @RequestParam("key") String name, @RequestParam("contentType") String contentType,
-            HttpServletRequest request) {
-        if (file == null) {
+            @RequestParam("uuid") String uuid, HttpServletRequest request) {
+        if (file == null)
             throw new NotFoundException(fnf);
-        }
-        if (contentType == null || !contentType.contains(type)) {
-            throw new NotSupportedException(fnv);
-        }
 
-        String id = handler.save(file, request.getHeader(originHeader)).get_id();
+        if (contentType == null || !contentType.contains(type))
+            throw new NotSupportedException(fnv);
+
+        if (name.isBlank())
+            throw new NotFoundException("name not found");
+
+        if (uuid.isBlank())
+            throw new NotFoundException("uuid not found");
+
+        String id = handler.save(file, request.getHeader(originHeader), name, contentType, uuid).get_id();
 
         CompletableFuture<FileModel> toAws = CompletableFuture.supplyAsync(() -> handler.upload(name, contentType));
 
@@ -165,6 +173,7 @@ public class VideoController {
         if (file == null) {
             throw new NotFoundException(fnf);
         }
+
         String contentType = file.getContentType();
         if (contentType == null || !contentType.contains(type)) {
             throw new NotSupportedException(fnv);
@@ -179,7 +188,7 @@ public class VideoController {
 
         handler.remove(name, contentType);
         String origin = request.getHeader(originHeader);
-        String parentId = handler.save(file, origin).get_id();
+        String parentId = handler.save(file, origin, name, fileModel.getMimeType(), fileModel.getUuid()).get_id();
         List<FileModel> subFiles = fileInterface.listSubFile(parentId);
         subFiles.forEach(f -> handler.removePreview(f.getName(), f.getMimeType()));
         CompletableFuture<FileModel> toAws = CompletableFuture.supplyAsync(() -> handler.upload(name, contentType));

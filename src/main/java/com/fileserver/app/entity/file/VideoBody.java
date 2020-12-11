@@ -16,8 +16,9 @@ public @Data class VideoBody {
     private String password;
     @NotBlank
     private String uuid;
-    @Min(900)
+    @NotBlank
     private String contentType;
+    @Min(900)
     private long exp = SecurityConstants.EXPIRATION_TIME;
     private boolean replace = false;
     private boolean preview = false;
