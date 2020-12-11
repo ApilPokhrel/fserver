@@ -51,15 +51,14 @@ public class FileController {
     private String fns = "file not saved in db";
 
     @Autowired
-    public FileController(FileService fileService, AWSUploadService awsUploadService,
-            FileInterface fileInterface, AuthService authService, UserRolesInterface rolesInterface) {
+    public FileController(FileService fileService, AWSUploadService awsUploadService, FileInterface fileInterface,
+            AuthService authService, UserRolesInterface rolesInterface) {
         this.fileService = fileService;
         this.awsUploadService = awsUploadService;
         this.fileInterface = fileInterface;
         this.authService = authService;
         this.rolesInterface = rolesInterface;
     }
-
 
     @PostMapping("/login")
     public Map<String, Object> login(@Valid @RequestBody FileBody body) {
@@ -69,7 +68,7 @@ public class FileController {
         if (filePayload.isPresent() && body.isReplace()) {
             res.put("url", "/file/replace" + filePayload.get().get_id());
             res.put("file", filePayload.get());
-        } else if(filePayload.isPresent() && body.isRemove()){
+        } else if (filePayload.isPresent() && body.isRemove()) {
             res.put("url", "/file/remove" + filePayload.get().get_id());
             res.put("file", filePayload.get());
         } else {
@@ -82,10 +81,15 @@ public class FileController {
 
     @PostMapping("/upload")
     public CompletableFuture<FileModel> upload(@RequestParam("file") MultipartFile file,
-    HttpServletRequest request){
+            @RequestParam("key") String name, @RequestParam("contentType") String contentType,
+            @RequestParam("uuid") String uuid, HttpServletRequest request) {
+        if (name.isBlank())
+            throw new NotFoundException("name not found");
 
+        if (uuid.isBlank())
+            throw new NotFoundException("uuid not found");
         return CompletableFuture.supplyAsync(() -> {
-            FileModel model = save(file, request.getHeader(originHeader));
+            FileModel model = save(file, request.getHeader(originHeader), name, contentType, uuid);
             upload(model.getName(), model.getMimeType());
             remove(model.getName());
             return model;
@@ -93,13 +97,13 @@ public class FileController {
     }
 
     @DeleteMapping("/remove/{id}")
-    public CompletableFuture<FileModel> removeFile(@PathVariable("id") String id){
+    public CompletableFuture<FileModel> removeFile(@PathVariable("id") String id) {
         return CompletableFuture.supplyAsync(() -> {
             Optional<FileModel> isFile = fileInterface.removeById(id);
             if (!isFile.isPresent())
                 throw new NotFoundException("file not found");
 
-            if(!isFile.get().isCompleted()){
+            if (!isFile.get().isCompleted()) {
                 fileService.remove(isFile.get().getName());
             }
             awsUploadService.remove(bucket, isFile.get().getName());
@@ -109,44 +113,43 @@ public class FileController {
 
     @PostMapping("/replace")
     public CompletableFuture<FileModel> upload(@PathVariable("id") String id, @RequestParam("file") MultipartFile file,
-    HttpServletRequest request){
+            HttpServletRequest request) {
         Optional<FileModel> isFile = fileInterface.removeById(id);
         if (!isFile.isPresent())
             throw new NotFoundException("cannot replace file not found");
 
-        if(!isFile.get().isCompleted()){
+        if (!isFile.get().isCompleted()) {
             fileService.remove(isFile.get().getName());
         }
 
         awsUploadService.remove(bucket, isFile.get().getName());
         return CompletableFuture.supplyAsync(() -> {
-            FileModel model = save(file, request.getHeader(originHeader));
+            FileModel model = save(file, request.getHeader(originHeader), isFile.get().getName(),
+                    isFile.get().getMimeType(), isFile.get().getUuid());
             upload(model.getName(), model.getMimeType());
             remove(model.getName());
             return model;
         });
     }
 
-
-    private FileModel save(MultipartFile file, String origin) {
+    private FileModel save(MultipartFile file, String origin, String name, String contentType, String uuid) {
         if (file == null) {
             throw new NotFoundException(fnf);
         }
-        String contentType = file.getContentType();
         if (contentType == null) {
             throw new NotSupportedException("content type not supported");
         }
 
         FileModel fileModel = new FileModel();
-        String name = fileService.uploadFile(file); // after this
+        fileService.uploadFile(file, name); // after this
         fileModel.setName(name);
         fileModel.setType(contentType.split("/")[0]);
         fileModel.setMimeType(contentType);
+        fileModel.setUuid(uuid);
         fileModel.setSize(file.getSize());
         fileModel.setOrigin(origin);
         return fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));
     }
-
 
     private FileModel upload(String name, String contentType) {
         awsUploadService.upload(bucket, name, contentType);
