@@ -88,8 +88,8 @@ public class FileImpl implements FileInterface {
 
     @Override
     public Optional<FileModel> subFile(String parentId, SubTypeEnum subType) {
-        Query query = new Query(Criteria.where("parent_id").is(new ObjectId(parentId))
-                .andOperator(Criteria.where("subType").is(subType)).andOperator(Criteria.where(is_parent).is(false)));
+        Query query = new Query(Criteria.where("parent_id").is(new ObjectId(parentId)).and("subType").is(subType)
+                .and(is_parent).is(false));
         return Optional.ofNullable(mTemplate.findOne(query, FileModel.class));
     }
 
@@ -103,8 +103,7 @@ public class FileImpl implements FileInterface {
 
     @Override
     public List<FileModel> listSubFile(String parentId) {
-        Query query = new Query(Criteria.where("parent_id").is(new ObjectId(parentId))
-                .andOperator(Criteria.where(is_parent).is(false)));
+        Query query = new Query(Criteria.where("parent_id").is(new ObjectId(parentId)).and(is_parent).is(false));
         return mTemplate.find(query, FileModel.class);
     }
 }
