@@ -49,7 +49,7 @@ public class VideoHandler {
 
     public FileModel upload(String name, String contentType) {
         awsUploadService.multipartUploadSync(bucket, name, contentType);
-        return fileInterface.updateStatus(name, true, false)
+        return fileInterface.updateStatus(name, true, false, false)
                 .orElseThrow(() -> new NotFoundException("file not updated while upload"));
     }
 
@@ -86,6 +86,10 @@ public class VideoHandler {
         return completePreview(previewModel.getName());
     }
 
+    public void setProcessed(String id, boolean processed) {
+        fileInterface.updateById(id, "processed", processed);
+    }
+
     private FileModel savePreview(String id, String fileName, String fileType) {
         FileModel previewModel = new FileModel();
         String preview = ffmpegService.createPreview(fileName); // db store preview created
@@ -100,7 +104,7 @@ public class VideoHandler {
 
     private FileModel uploadPreview(String preview, String contentType) {
         awsUploadService.upload(bucket, preview, contentType); // db store preview uploaded
-        return fileInterface.updateStatus(preview, true, false)
+        return fileInterface.updateStatus(preview, true, true, false)
                 .orElseThrow(() -> new NotFoundException("preview not updated while uploading"));
     }
 

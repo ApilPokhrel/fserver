@@ -1,15 +1,24 @@
 package com.fileserver.app.dao.file;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import com.fileserver.app.entity.file.FileModel;
+import com.fileserver.app.entity.file.FileModelP;
 import com.fileserver.app.entity.file.SubTypeEnum;
 
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.FacetOperation;
+import org.springframework.data.mongodb.core.aggregation.GroupOperation;
+import org.springframework.data.mongodb.core.aggregation.LimitOperation;
+import org.springframework.data.mongodb.core.aggregation.MatchOperation;
+import org.springframework.data.mongodb.core.aggregation.SkipOperation;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -78,10 +87,11 @@ public class FileImpl implements FileInterface {
     }
 
     @Override
-    public Optional<FileModel> updateStatus(String name, boolean uploaded, boolean completed) {
+    public Optional<FileModel> updateStatus(String name, boolean uploaded, boolean processed, boolean completed) {
         Query query = new Query(Criteria.where("name").is(name));
         Update update = new Update().set("uploaded", uploaded);
         update.set("completed", completed);
+        update.set("processed", processed);
         FindAndModifyOptions options = new FindAndModifyOptions().returnNew(true);
         return Optional.ofNullable(mTemplate.findAndModify(query, update, options, FileModel.class));
     }
@@ -105,5 +115,32 @@ public class FileImpl implements FileInterface {
     public List<FileModel> listSubFile(String parentId) {
         Query query = new Query(Criteria.where("parent_id").is(new ObjectId(parentId)).and(is_parent).is(false));
         return mTemplate.find(query, FileModel.class);
+    }
+
+    @Override
+    public FileModelP list(long start, long limit, Map<String, String> q) {
+        Criteria criteria = new Criteria();
+
+        if (q != null) {
+            Set<String> keys = q.keySet();
+            for (String k : keys) {
+                criteria.and(k).is(q.get(k));
+            }
+        }
+        MatchOperation match = Aggregation.match(criteria);
+        LimitOperation limitOperation = Aggregation.limit(limit);
+        SkipOperation skipOperation = Aggregation.skip(start);
+
+        GroupOperation groupOperation = Aggregation.group().count().as("count");
+        FacetOperation facetOperation = Aggregation.facet(match, limitOperation, skipOperation).as("data")
+                .and(match, groupOperation).as("totalCount");
+
+        Aggregation aggregation = Aggregation.newAggregation(facetOperation);
+        FileModelP model = mTemplate.aggregate(aggregation, FileModel.class, FileModelP.class).getMappedResults()
+                .get(0);
+        model.setLimit(limit);
+        model.setStart(start);
+        model.setTotal(Long.valueOf(model.getTotalCount().get("count").toString()));
+        return model;
     }
 }

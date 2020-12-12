@@ -153,7 +153,7 @@ public class FileController {
 
     private FileModel upload(String name, String contentType) {
         awsUploadService.upload(bucket, name, contentType);
-        return fileInterface.updateStatus(name, true, false)
+        return fileInterface.updateStatus(name, true, true, false)
                 .orElseThrow(() -> new NotFoundException("file not updated while upload"));
     }
 

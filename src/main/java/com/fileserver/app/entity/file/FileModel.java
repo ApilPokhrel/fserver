@@ -32,6 +32,7 @@ public @Data class FileModel {
     private String origin; // from which origin it is uploaded
     private boolean uploaded = false; // is it uploaded to aws
     private boolean completed = false; // is it completed
+    private boolean processed = false;
     private int version;
     private String path;
     private Object user;

@@ -238,7 +238,7 @@ public class PDFController {
 
     private FileModel upload(String name, String contentType) {
         awsUploadService.upload(bucket, name, contentType);
-        return fileInterface.updateStatus(name, true, false)
+        return fileInterface.updateStatus(name, true, true, false)
                 .orElseThrow(() -> new NotFoundException("pdf not updated while upload"));
     }
 

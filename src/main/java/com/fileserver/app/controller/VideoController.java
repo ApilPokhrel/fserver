@@ -2,6 +2,7 @@ package com.fileserver.app.controller;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -11,6 +12,7 @@ import javax.validation.Valid;
 import com.fileserver.app.dao.file.FileInterface;
 import com.fileserver.app.dao.user.UserRolesInterface;
 import com.fileserver.app.entity.file.FileModel;
+import com.fileserver.app.entity.file.FileModelP;
 import com.fileserver.app.entity.file.ResponseBody;
 import com.fileserver.app.entity.file.VideoBody;
 import com.fileserver.app.entity.user.User;
@@ -23,7 +25,10 @@ import com.fileserver.app.service.FileService;
 import com.fileserver.app.util.TokenUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -89,11 +94,11 @@ public class VideoController {
                 sb.append("/video/replace/" + model.get_id());
                 res.setMethod("post");
                 res.setMultipart(true);
-            } else if (!model.isUploaded()) {
+            } else if (!model.isUploaded() || !model.isProcessed()) {
                 sb.append("/video/process/" + model.get_id());
                 res.setMethod("post");
                 res.setMultipart(false);
-            } else if (!model.isCompleted() && model.isUploaded()) {
+            } else if (!model.isCompleted() && model.isUploaded() && model.isProcessed()) {
                 sb.append("/video/complete/" + model.get_id());
                 res.setMethod("post");
                 res.setMultipart(false);
@@ -143,8 +148,11 @@ public class VideoController {
 
         CompletableFuture<FileModel> toAws = CompletableFuture.supplyAsync(() -> handler.upload(name, contentType));
 
-        CompletableFuture<FileModel> toPreview = CompletableFuture
-                .supplyAsync(() -> handler.preview(id, name, contentType));
+        CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
+            FileModel preview = handler.preview(id, name, contentType);
+            handler.setProcessed(id, true);
+            return preview;
+        });
 
         return toAws.thenCombine(toPreview, (aws, prev) -> handler.complete(name));
     }
@@ -155,10 +163,26 @@ public class VideoController {
         CompletableFuture<FileModel> toAws = CompletableFuture
                 .supplyAsync(() -> handler.upload(model.getName(), model.getMimeType()));
 
-        CompletableFuture<FileModel> toPreview = CompletableFuture
-                .supplyAsync(() -> handler.preview(model.get_id(), model.getName(), model.getMimeType()));
+        CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
+            FileModel preview = handler.preview(model.get_id(), model.getName(), model.getMimeType());
+            handler.setProcessed(model.get_id(), true);
+            return preview;
+        });
 
-        return toAws.thenCombine(toPreview, (aws, prev) -> handler.complete(model.getName()));
+        if (!model.isProcessed() && !model.isUploaded()) {
+            return toAws.thenCombine(toPreview, (aws, prev) -> handler.complete(model.getName()));
+
+        }
+
+        if (!model.isUploaded()) {
+            return toAws;
+        }
+
+        if (!model.isProcessed()) {
+            return toPreview;
+        }
+
+        return null;
     }
 
     @PostMapping("/complete/{id}")
@@ -245,4 +269,12 @@ public class VideoController {
             return prev;
         });
     }
+
+    @GetMapping("/")
+    public CompletableFuture<ResponseEntity<FileModelP>> list(@RequestParam("start") long start,
+            @RequestParam("limit") long limit, @RequestBody(required = false) Map<String, String> q) {
+        return CompletableFuture.supplyAsync(() -> ResponseEntity.ok(fileInterface.list(start, limit, q)))
+                .exceptionally(ex -> ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null));
+    }
+
 }

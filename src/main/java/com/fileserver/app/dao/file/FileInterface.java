@@ -1,9 +1,11 @@
 package com.fileserver.app.dao.file;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.fileserver.app.entity.file.FileModel;
+import com.fileserver.app.entity.file.FileModelP;
 import com.fileserver.app.entity.file.SubTypeEnum;
 
 import org.springframework.stereotype.Repository;
@@ -20,7 +22,7 @@ public interface FileInterface {
 
     Optional<FileModel> updateById(String id, String key, Object value);
 
-    Optional<FileModel> updateStatus(String name, boolean uploaded, boolean completed);
+    Optional<FileModel> updateStatus(String name, boolean uploaded, boolean processed, boolean completed);
 
     Optional<FileModel> subFile(String parentId, SubTypeEnum subType);
 
@@ -35,4 +37,6 @@ public interface FileInterface {
     Optional<FileModel> removeChild(String parent, String type);
 
     List<FileModel> listSubFile(String parentId);
+
+    FileModelP list(long start, long limit, Map<String, String> q);
 }
