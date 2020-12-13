@@ -112,6 +112,8 @@ public class VideoController {
                 res.setCompleted(true);
             }
 
+        } else if (body.isRemove()) {
+            throw new NotFoundException("file not found");
         } else if (body.isPreview()) {
             sb.append("/video/preview/");
             sb.append("?key=" + body.getName());
