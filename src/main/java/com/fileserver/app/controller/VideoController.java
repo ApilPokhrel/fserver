@@ -28,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -80,9 +81,13 @@ public class VideoController {
             FileModel model = fOptional.get();
             if (model.getUuid() == null || !model.getUuid().equals(body.getUuid()))
                 throw new NotSupportedException("invalid owner");
-
             boolean exists = fileService.exists(body.getName());
-            if (body.isPreview() && exists) {
+
+            if (body.isRemove()) {
+                sb.append("/video/remove/" + model.get_id());
+                res.setMethod("delete");
+                res.setMultipart(false);
+            } else if (body.isPreview() && exists) {
                 sb.append("/video/preview/" + model.get_id() + "/exists");
                 res.setMethod("post");
                 res.setMultipart(false);
@@ -267,6 +272,18 @@ public class VideoController {
             FileModel prev = handler.preview(model.get_id(), model.getName(), model.getMimeType());
             handler.complete(model.getName());
             return prev;
+        });
+    }
+
+    @DeleteMapping("/remove/{id}")
+    public CompletableFuture<FileModel> remove(@PathVariable("id") String id) {
+        Optional<FileModel> isFile = fileInterface.getById(id);
+        if (!isFile.isPresent())
+            throw new NotFoundException("file not found");
+        return CompletableFuture.supplyAsync(() -> {
+            FileModel model = isFile.get();
+            handler.removeAll(model);
+            return model;
         });
     }
 

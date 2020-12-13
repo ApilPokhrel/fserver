@@ -1,5 +1,6 @@
 package com.fileserver.app.handler;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.fileserver.app.dao.file.FileInterface;
@@ -66,6 +67,16 @@ public class VideoHandler {
         if (preview.isPresent()) {
             fileService.remove(preview.get().getName());
             awsUploadService.remove(bucket, preview.get().getName());
+        }
+    }
+
+    public void removeAll(FileModel model) {
+        fileService.remove(model.getName());
+        awsUploadService.remove(bucket, model.getName());
+        List<FileModel> subFiles = fileInterface.listSubFile(model.get_id());
+        for (FileModel sb : subFiles) {
+            fileService.remove(sb.getName());
+            awsUploadService.remove(bucket, sb.getName());
         }
     }
 

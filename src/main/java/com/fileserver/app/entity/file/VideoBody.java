@@ -22,4 +22,5 @@ public @Data class VideoBody {
     private long exp = SecurityConstants.EXPIRATION_TIME;
     private boolean replace = false;
     private boolean preview = false;
+    private boolean remove = false;
 }
