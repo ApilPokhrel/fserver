@@ -65,12 +65,22 @@ public class FFMPEGService {
         return preview;
     }
 
-
     // 10 min clip
     private double[] generateClipTimes(double duration) {
         double[] dd = new double[9];
         if (duration < 10d) {
             return new double[0];
+        } else if (duration < 100) {
+            dd[0] = duration / 3d;
+            dd[1] = duration / 2d;
+            dd[3] = (duration / 1d) - 10;
+            return dd;
+        } else if (duration < 200) {
+            dd[0] = duration / 4d;
+            dd[1] = duration / 3d;
+            dd[3] = (duration / 4d);
+            dd[4] = duration - 10d;
+            return dd;
         }
 
         double step = ((duration - 10) / 10);
