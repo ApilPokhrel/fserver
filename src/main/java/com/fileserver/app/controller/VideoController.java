@@ -1,6 +1,8 @@
 package com.fileserver.app.controller;
 
 import java.io.File;
+import java.net.MalformedURLException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,18 +17,22 @@ import com.fileserver.app.entity.file.FileModel;
 import com.fileserver.app.entity.file.FileModelP;
 import com.fileserver.app.entity.file.ResponseBody;
 import com.fileserver.app.entity.file.VideoBody;
+import com.fileserver.app.entity.file.VideoDetail;
 import com.fileserver.app.entity.user.User;
+import com.fileserver.app.exception.FileNotDownloadedException;
 import com.fileserver.app.exception.NotFoundException;
 import com.fileserver.app.exception.NotSupportedException;
 import com.fileserver.app.handler.VideoHandler;
 import com.fileserver.app.service.AWSUploadService;
 import com.fileserver.app.service.AuthService;
+import com.fileserver.app.service.FileDownloadService;
 import com.fileserver.app.service.FileService;
 import com.fileserver.app.util.TokenUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,6 +55,7 @@ public class VideoController {
     private UserRolesInterface rolesInterface;
     private VideoHandler handler;
     private AWSUploadService awsUploadService;
+    private FileDownloadService fileDownloadService;
 
     String completed = "completed";
     String uploaded = "uploaded";
@@ -56,13 +63,15 @@ public class VideoController {
 
     @Autowired
     public VideoController(FileService fileService, FileInterface fileInterface, AuthService authService,
-            UserRolesInterface rolesInterface, VideoHandler handler, AWSUploadService awsUploadService) {
+            UserRolesInterface rolesInterface, VideoHandler handler, AWSUploadService awsUploadService,
+            FileDownloadService fileDownloadService) {
         this.fileService = fileService;
         this.fileInterface = fileInterface;
         this.authService = authService;
         this.rolesInterface = rolesInterface;
         this.handler = handler;
         this.awsUploadService = awsUploadService;
+        this.fileDownloadService = fileDownloadService;
     }
 
     private String fnf = "file not found";
@@ -118,6 +127,16 @@ public class VideoController {
             sb.append("/video/preview/");
             sb.append("?key=" + body.getName());
             sb.append("&contentType=" + body.getContentType());
+            sb.append("&uuid=" + body.getUuid());
+            res.setMethod("post");
+            res.setMultipart(false);
+        } else if (body.isDownload()) {
+            sb.append("/video/download/");
+            sb.append("?key=" + body.getName());
+            sb.append("&contentType=" + body.getContentType());
+            sb.append("&url=" + body.getUrl());
+            sb.append("&uuid=" + body.getUuid());
+            sb.append("&origin=" + body.getOrigin());
             res.setMethod("post");
             res.setMultipart(false);
         } else {
@@ -164,6 +183,58 @@ public class VideoController {
         return toAws.thenCombine(toPreview, (aws, prev) -> handler.complete(name));
     }
 
+    @PostMapping("/download")
+    public CompletableFuture<Map<String, Object>> uploadFileSync(@RequestParam("url") String url,
+            @RequestParam("key") String name, @RequestParam("contentType") String contentType,
+            @RequestParam("uuid") String uuid, @RequestParam("origin") String origin) {
+
+        if (contentType == null || !contentType.contains(type))
+            throw new NotSupportedException(fnv);
+
+        if (name.isBlank())
+            throw new NotFoundException("name not found");
+
+        if (uuid.isBlank())
+            throw new NotFoundException("uuid not found");
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                fileDownloadService.downloadFile(url, name);
+            } catch (MalformedURLException e) {
+                throw new FileNotDownloadedException("Url malformed", e);
+            }
+            VideoDetail vd = handler.detail(name);
+            FileModel model = new FileModel();
+            model.setOrigin(origin);
+            model.setUuid(uuid);
+            model.setName(name);
+            model.setMimeType(contentType);
+            model.setType("video");
+            model.setSize(vd.getSize());
+            model.set_parent(true);
+            model = fileInterface.add(model).orElseThrow();
+            final String id = model.get_id();
+            synchronized (this) {
+                CompletableFuture<FileModel> toAws = CompletableFuture
+                        .supplyAsync(() -> handler.upload(name, contentType));
+
+                CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
+                    FileModel preview = handler.preview(id, name, contentType);
+                    handler.setProcessed(id, true);
+                    return preview;
+                });
+
+                return toAws.thenCombine(toPreview, (aws, prev) -> {
+                    Map<String, Object> rs = new HashMap<>();
+                    rs.put("info", vd);
+                    rs.put("file", handler.complete(name));
+                    rs.put("preview", prev);
+                    return rs;
+                }).join();
+
+            }
+        });
+    }
+
     @PostMapping("/process/{id}")
     public CompletableFuture<FileModel> process(@PathVariable("id") String id) {
         FileModel model = fileInterface.getById(id).orElseThrow();
@@ -196,6 +267,12 @@ public class VideoController {
     public CompletableFuture<FileModel> upload(@PathVariable("id") String id) {
         FileModel model = fileInterface.getById(id).orElseThrow();
         return CompletableFuture.supplyAsync(() -> handler.complete(model.getName()));
+    }
+
+    @PreAuthorize("permitAll()")
+    @PostMapping("/test-detail")
+    public CompletableFuture<VideoDetail> detail() {
+        return CompletableFuture.supplyAsync(() -> handler.detail("Saving Private Ryan.1998.720p.BrRip.x264.YIFY.mp4"));
     }
 
     @PostMapping("/replace/{id}")

@@ -23,4 +23,7 @@ public @Data class VideoBody {
     private boolean replace = false;
     private boolean preview = false;
     private boolean remove = false;
+    private boolean download = false;
+    private String url;
+    private String origin;
 }

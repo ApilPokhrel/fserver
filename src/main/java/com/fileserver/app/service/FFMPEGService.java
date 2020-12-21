@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import com.fileserver.app.entity.file.VideoDetail;
 import com.fileserver.app.exception.FFMPEGException;
 import com.mongodb.lang.NonNull;
 
@@ -39,6 +40,24 @@ public class FFMPEGService {
         ffprobe = new FFprobe("/usr/bin/ffprobe");
     }
 
+    public VideoDetail detail(@NonNull String filename) {
+        FFmpegProbeResult probeResult;
+        try {
+            probeResult = ffprobe.probe(uploadDir + "/" + filename);
+        } catch (IOException e) {
+            throw new FFMPEGException(filename + " cannot format");
+        }
+        FFmpegFormat format = probeResult.getFormat();
+        int width = 0;
+        int height = 0;
+        try {
+            height = probeResult.getStreams().get(0).height;
+            width = probeResult.getStreams().get(0).width;
+        } catch (Exception e) {
+            e.getCause();
+        }
+        return new VideoDetail(format.duration, height, width, format.size);
+    }
     // 4 seconds after 3 seconds from front, 3 seconds from middle, 3 seconds from
     // 40 seconds before last
 
@@ -51,6 +70,7 @@ public class FFMPEGService {
             throw new FFMPEGException(filename + " cannot format");
         }
         FFmpegFormat format = probeResult.getFormat();
+
         double duration = format.duration;
         List<String> clips = new ArrayList<>();
         double[] dd = generateClipTimes(duration);

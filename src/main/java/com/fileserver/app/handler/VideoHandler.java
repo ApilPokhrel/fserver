@@ -6,6 +6,7 @@ import java.util.Optional;
 import com.fileserver.app.dao.file.FileInterface;
 import com.fileserver.app.entity.file.FileModel;
 import com.fileserver.app.entity.file.SubTypeEnum;
+import com.fileserver.app.entity.file.VideoDetail;
 import com.fileserver.app.exception.NotFoundException;
 import com.fileserver.app.exception.NotSupportedException;
 import com.fileserver.app.service.AWSUploadService;
@@ -133,6 +134,10 @@ public class VideoHandler {
             fileService.remove(preview.get().getName());
             awsUploadService.remove(bucket, preview.get().getName());
         }
+    }
+
+    public VideoDetail detail(String name) {
+        return ffmpegService.detail(name);
     }
 
 }
