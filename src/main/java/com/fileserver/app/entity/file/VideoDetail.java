@@ -11,4 +11,5 @@ public @Data class VideoDetail {
     private int height;
     private int width;
     private long size;
+    private String mimeType;
 }

@@ -184,9 +184,9 @@ public class VideoController {
     }
 
     @PostMapping("/download")
-    public CompletableFuture<Map<String, Object>> uploadFileSync(@RequestParam("url") String url,
-            @RequestParam("key") String name, @RequestParam("contentType") String contentType,
-            @RequestParam("uuid") String uuid, @RequestParam("origin") String origin) {
+    public CompletableFuture<Object> uploadFileSync(@RequestParam("url") String url, @RequestParam("key") String name,
+            @RequestParam("contentType") String contentType, @RequestParam("uuid") String uuid,
+            @RequestParam("origin") String origin) {
 
         if (contentType == null || !contentType.contains(type))
             throw new NotSupportedException(fnv);
@@ -196,41 +196,92 @@ public class VideoController {
 
         if (uuid.isBlank())
             throw new NotFoundException("uuid not found");
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                fileDownloadService.downloadFile(url, name);
-            } catch (MalformedURLException e) {
-                throw new FileNotDownloadedException("Url malformed", e);
-            }
-            VideoDetail vd = handler.detail(name);
-            FileModel model = new FileModel();
-            model.setOrigin(origin);
-            model.setUuid(uuid);
-            model.setName(name);
-            model.setMimeType(contentType);
-            model.setType("video");
-            model.setSize(vd.getSize());
-            model.set_parent(true);
-            model = fileInterface.add(model).orElseThrow();
-            final String id = model.get_id();
-            synchronized (this) {
-                CompletableFuture<FileModel> toAws = CompletableFuture
-                        .supplyAsync(() -> handler.upload(name, contentType));
 
+        CompletableFuture<FileModel> toAws = CompletableFuture.supplyAsync(() -> handler.upload(name, contentType));
+
+        return CompletableFuture.supplyAsync(() -> {
+            Optional<FileModel> file = fileInterface.getByName(name);
+            if (file.isPresent()) {
+                FileModel model = file.get();
+                if (!fileService.exists(name)) {
+                    try {
+                        fileDownloadService.downloadFile(url, name);
+                    } catch (MalformedURLException e) {
+                        throw new FileNotDownloadedException("Url malformed", e);
+                    }
+                }
+
+                VideoDetail vd = handler.detail(name);
+
+                CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
+                    FileModel preview = handler.preview(model.get_id(), name, contentType);
+                    handler.setProcessed(model.get_id(), true);
+                    return preview;
+                });
+
+                if (!model.isProcessed() && !model.isUploaded()) {
+                    return toAws.thenCombine(toPreview, (aws, prev) -> {
+                        Map<String, Object> rs = new HashMap<>();
+                        handler.complete(model.getName());
+                        rs.put("info", vd);
+                        rs.put("file", handler.complete(name));
+                        rs.put("preview", prev);
+                        return rs;
+                    });
+
+                }
+
+                if (!model.isUploaded()) {
+                    return toAws.thenApply(d -> {
+                        Map<String, Object> rs = new HashMap<>();
+                        rs.put("info", vd);
+                        rs.put("file", handler.complete(name));
+                        return rs;
+                    });
+                }
+
+                if (!model.isProcessed()) {
+                    return toPreview.thenApply(p -> {
+                        Map<String, Object> rs = new HashMap<>();
+                        rs.put("info", vd);
+                        rs.put("file", handler.complete(name));
+                        rs.put("preview", p);
+                        return rs;
+                    });
+                }
+                return null;
+            } else {
+                try {
+                    fileDownloadService.downloadFile(url, name);
+                } catch (MalformedURLException e) {
+                    throw new FileNotDownloadedException("Url malformed", e);
+                }
+                VideoDetail vd = handler.detail(name);
+                FileModel model = new FileModel();
+                model.setOrigin(origin);
+                model.setUuid(uuid);
+                model.setName(name);
+                model.setMimeType(contentType);
+                model.setType("video");
+                model.setSize(vd.getSize());
+                model.set_parent(true);
+                model = fileInterface.add(model).orElseThrow();
+                final String id = model.get_id();
                 CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
                     FileModel preview = handler.preview(id, name, contentType);
                     handler.setProcessed(id, true);
                     return preview;
                 });
+                synchronized (this) {
 
-                return toAws.thenCombine(toPreview, (aws, prev) -> {
-                    Map<String, Object> rs = new HashMap<>();
-                    rs.put("info", vd);
-                    rs.put("file", handler.complete(name));
-                    rs.put("preview", prev);
-                    return rs;
-                }).join();
-
+                    return toAws.thenCombine(toPreview, (aws, prev) -> {
+                        Map<String, Object> rs = new HashMap<>();
+                        rs.put("info", vd);
+                        rs.put("file", handler.complete(name));
+                        rs.put("preview", prev);
+                        return rs;
+                    }).join();
+                }
             }
         });
     }

@@ -25,6 +25,7 @@ import net.bramp.ffmpeg.FFprobe;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import net.bramp.ffmpeg.probe.FFmpegFormat;
 import net.bramp.ffmpeg.probe.FFmpegProbeResult;
+import net.bramp.ffmpeg.probe.FFmpegStream;
 
 @Service
 public class FFMPEGService {
@@ -50,13 +51,18 @@ public class FFMPEGService {
         FFmpegFormat format = probeResult.getFormat();
         int width = 0;
         int height = 0;
+        String mimeType = "video/mp4";
         try {
-            height = probeResult.getStreams().get(0).height;
-            width = probeResult.getStreams().get(0).width;
+            FFmpegStream stream = probeResult.getStreams().get(0);
+            height = stream.height;
+            width = stream.width;
+            mimeType = stream.codec_type + "/" + stream.codec_tag_string;
+
         } catch (Exception e) {
             e.getCause();
         }
-        return new VideoDetail(format.duration, height, width, format.size);
+
+        return new VideoDetail(format.duration, height, width, format.size, mimeType);
     }
     // 4 seconds after 3 seconds from front, 3 seconds from middle, 3 seconds from
     // 40 seconds before last
