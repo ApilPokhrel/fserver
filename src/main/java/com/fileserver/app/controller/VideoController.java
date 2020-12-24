@@ -212,6 +212,7 @@ public class VideoController {
                 }
 
                 VideoDetail vd = handler.detail(name);
+                System.out.println(vd.getDuration());
 
                 CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
                     FileModel preview = handler.preview(model.get_id(), name, contentType);
