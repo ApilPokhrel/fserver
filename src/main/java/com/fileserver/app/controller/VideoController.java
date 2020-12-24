@@ -200,8 +200,11 @@ public class VideoController {
         return CompletableFuture.supplyAsync(() -> {
             Optional<FileModel> file = fileInterface.getByName(name);
             if (file.isPresent()) {
+                System.out.println("present=============");
+
                 FileModel model = file.get();
                 if (!fileService.exists(name)) {
+                    System.out.println("Not exists========");
                     fileDownloadService.downloadFile(url, name);
                 }
 
