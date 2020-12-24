@@ -195,8 +195,6 @@ public class VideoController {
         if (uuid.isBlank())
             throw new NotFoundException("uuid not found");
 
-        CompletableFuture<FileModel> toAws = CompletableFuture.supplyAsync(() -> handler.upload(name, contentType));
-
         return CompletableFuture.supplyAsync(() -> {
             Optional<FileModel> file = fileInterface.getByName(name);
             if (file.isPresent()) {
@@ -210,13 +208,15 @@ public class VideoController {
 
                 VideoDetail vd = handler.detail(name);
 
-                CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
-                    FileModel preview = handler.preview(model.get_id(), name, contentType);
-                    handler.setProcessed(model.get_id(), true);
-                    return preview;
-                });
-
                 if (!model.isProcessed() && !model.isUploaded()) {
+                    CompletableFuture<FileModel> toAws = CompletableFuture
+                            .supplyAsync(() -> handler.upload(name, contentType));
+                    CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
+                        FileModel preview = handler.preview(model.get_id(), name, contentType);
+                        handler.setProcessed(model.get_id(), true);
+                        return preview;
+                    });
+
                     return toAws.thenCombine(toPreview, (aws, prev) -> {
                         Map<String, Object> rs = new HashMap<>();
                         handler.complete(model.getName());
@@ -229,6 +229,9 @@ public class VideoController {
                 }
 
                 if (!model.isUploaded()) {
+                    CompletableFuture<FileModel> toAws = CompletableFuture
+                            .supplyAsync(() -> handler.upload(name, contentType));
+
                     return toAws.thenApply(d -> {
                         Map<String, Object> rs = new HashMap<>();
                         rs.put("info", vd);
@@ -238,6 +241,11 @@ public class VideoController {
                 }
 
                 if (!model.isProcessed()) {
+                    CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
+                        FileModel preview = handler.preview(model.get_id(), name, contentType);
+                        handler.setProcessed(model.get_id(), true);
+                        return preview;
+                    });
                     return toPreview.thenApply(p -> {
                         Map<String, Object> rs = new HashMap<>();
                         rs.put("info", vd);
@@ -248,6 +256,8 @@ public class VideoController {
                 }
                 return null;
             } else {
+                System.out.println("not present=============");
+
                 fileDownloadService.downloadFile(url, name);
                 VideoDetail vd = handler.detail(name);
                 FileModel model = new FileModel();
@@ -260,6 +270,10 @@ public class VideoController {
                 model.set_parent(true);
                 model = fileInterface.add(model).orElseThrow();
                 final String id = model.get_id();
+
+                CompletableFuture<FileModel> toAws = CompletableFuture
+                        .supplyAsync(() -> handler.upload(name, contentType));
+
                 CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
                     FileModel preview = handler.preview(id, name, contentType);
                     handler.setProcessed(id, true);
