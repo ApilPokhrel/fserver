@@ -1,7 +1,6 @@
 package com.fileserver.app.controller;
 
 import java.io.File;
-import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +18,6 @@ import com.fileserver.app.entity.file.ResponseBody;
 import com.fileserver.app.entity.file.VideoBody;
 import com.fileserver.app.entity.file.VideoDetail;
 import com.fileserver.app.entity.user.User;
-import com.fileserver.app.exception.FileNotDownloadedException;
 import com.fileserver.app.exception.NotFoundException;
 import com.fileserver.app.exception.NotSupportedException;
 import com.fileserver.app.handler.VideoHandler;
@@ -204,15 +202,10 @@ public class VideoController {
             if (file.isPresent()) {
                 FileModel model = file.get();
                 if (!fileService.exists(name)) {
-                    try {
-                        fileDownloadService.downloadFile(url, name);
-                    } catch (MalformedURLException e) {
-                        throw new FileNotDownloadedException("Url malformed", e);
-                    }
+                    fileDownloadService.downloadFile(url, name);
                 }
 
                 VideoDetail vd = handler.detail(name);
-                System.out.println(vd.getDuration());
 
                 CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
                     FileModel preview = handler.preview(model.get_id(), name, contentType);
@@ -252,11 +245,7 @@ public class VideoController {
                 }
                 return null;
             } else {
-                try {
-                    fileDownloadService.downloadFile(url, name);
-                } catch (MalformedURLException e) {
-                    throw new FileNotDownloadedException("Url malformed", e);
-                }
+                fileDownloadService.downloadFile(url, name);
                 VideoDetail vd = handler.detail(name);
                 FileModel model = new FileModel();
                 model.setOrigin(origin);
