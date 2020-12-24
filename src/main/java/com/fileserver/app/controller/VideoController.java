@@ -89,8 +89,16 @@ public class VideoController {
             if (model.getUuid() == null || !model.getUuid().equals(body.getUuid()))
                 throw new NotSupportedException("invalid owner");
             boolean exists = fileService.exists(body.getName());
-
-            if (body.isRemove()) {
+            if (body.isDownload()) {
+                sb.append("/video/download/");
+                sb.append("?key=" + body.getName());
+                sb.append("&contentType=" + body.getContentType());
+                sb.append("&url=" + body.getUrl());
+                sb.append("&uuid=" + body.getUuid());
+                sb.append("&origin=" + body.getOrigin());
+                res.setMethod("post");
+                res.setMultipart(false);
+            } else if (body.isRemove()) {
                 sb.append("/video/remove/" + model.get_id());
                 res.setMethod("delete");
                 res.setMultipart(false);
