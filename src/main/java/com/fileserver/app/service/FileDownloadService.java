@@ -4,12 +4,13 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.WritableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
 import com.fileserver.app.exception.FileNotDownloadedException;
 
@@ -23,39 +24,19 @@ public class FileDownloadService {
     @Value("${app.upload.dir}")
     public String uploadDir;
 
-    public synchronized String nioDownloadFile(String urlName, String name) throws MalformedURLException {
-
+    public synchronized String nioDownloadFile(String urlName, String name) {
         try {
-            URL url = new URL(urlName);
-            ReadableByteChannel readableByteChannel = Channels.newChannel(url.openStream());
-            String downloadedFile = name;
-            FileOutputStream fileOutputStream = new FileOutputStream(
-                    uploadDir + File.separator + StringUtils.cleanPath(downloadedFile));
-            WritableByteChannel writableByteChannel = fileOutputStream.getChannel();
-            //
-            //
-            ByteBuffer buffer = ByteBuffer.allocate(1024);
-
-            while (readableByteChannel.read(buffer) != -1) {
-                buffer.flip();
-                while (buffer.hasRemaining()) {
-                    writableByteChannel.write(buffer);
-
-                }
-                buffer.clear();
-            }
-            //
-            //
-            readableByteChannel.close();
-            fileOutputStream.flush();
-            fileOutputStream.close();
-            return downloadedFile;
+            URL website = new URL(urlName);
+            InputStream in = website.openStream();
+            Path copyLocation = Paths.get(uploadDir + File.separator + StringUtils.cleanPath(name));
+            Files.copy(in, copyLocation, StandardCopyOption.REPLACE_EXISTING);
         } catch (MalformedURLException ex) {
             throw new FileNotDownloadedException("File Not Downloaded", ex);
         } catch (IOException e) {
             throw new FileNotDownloadedException("File Not Downloaded", e);
         }
 
+        return name;
     }
 
     public synchronized String downloadFile(String urlName, String name) {

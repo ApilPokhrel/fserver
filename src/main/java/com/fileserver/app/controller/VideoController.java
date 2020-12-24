@@ -198,12 +198,11 @@ public class VideoController {
         return CompletableFuture.supplyAsync(() -> {
             Optional<FileModel> file = fileInterface.getByName(name);
             if (file.isPresent()) {
-                System.out.println("present=============");
-
                 FileModel model = file.get();
                 if (!fileService.exists(name)) {
-                    System.out.println("Not exists========");
-                    fileDownloadService.downloadFile(url, name);
+                    System.out.println("Waiting .... ");
+                    fileDownloadService.nioDownloadFile(url, name);
+                    System.out.println("Complete");
                 }
 
                 VideoDetail vd = handler.detail(name);
@@ -256,9 +255,9 @@ public class VideoController {
                 }
                 return null;
             } else {
-                System.out.println("not present=============");
-
-                fileDownloadService.downloadFile(url, name);
+                System.out.println("Waiting .... ");
+                fileDownloadService.nioDownloadFile(url, name);
+                System.out.println("Complete");
                 VideoDetail vd = handler.detail(name);
                 FileModel model = new FileModel();
                 model.setOrigin(origin);
@@ -295,26 +294,31 @@ public class VideoController {
     @PostMapping("/process/{id}")
     public CompletableFuture<FileModel> process(@PathVariable("id") String id) {
         FileModel model = fileInterface.getById(id).orElseThrow();
-        CompletableFuture<FileModel> toAws = CompletableFuture
-                .supplyAsync(() -> handler.upload(model.getName(), model.getMimeType()));
-
-        CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
-            FileModel preview = handler.preview(model.get_id(), model.getName(), model.getMimeType());
-            handler.setProcessed(model.get_id(), true);
-            return preview;
-        });
 
         if (!model.isProcessed() && !model.isUploaded()) {
+            CompletableFuture<FileModel> toAws = CompletableFuture
+                    .supplyAsync(() -> handler.upload(model.getName(), model.getMimeType()));
+
+            CompletableFuture<FileModel> toPreview = CompletableFuture.supplyAsync(() -> {
+                FileModel preview = handler.preview(model.get_id(), model.getName(), model.getMimeType());
+                handler.setProcessed(model.get_id(), true);
+                return preview;
+            });
             return toAws.thenCombine(toPreview, (aws, prev) -> handler.complete(model.getName()));
 
         }
 
         if (!model.isUploaded()) {
-            return toAws;
+            return CompletableFuture.supplyAsync(() -> handler.upload(model.getName(), model.getMimeType()));
         }
 
         if (!model.isProcessed()) {
-            return toPreview;
+
+            return CompletableFuture.supplyAsync(() -> {
+                FileModel preview = handler.preview(model.get_id(), model.getName(), model.getMimeType());
+                handler.setProcessed(model.get_id(), true);
+                return preview;
+            });
         }
 
         return null;
