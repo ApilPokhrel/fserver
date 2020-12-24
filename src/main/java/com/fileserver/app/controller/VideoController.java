@@ -272,16 +272,15 @@ public class VideoController {
                     handler.setProcessed(id, true);
                     return preview;
                 });
-                synchronized (this) {
 
-                    return toAws.thenCombine(toPreview, (aws, prev) -> {
-                        Map<String, Object> rs = new HashMap<>();
-                        rs.put("info", vd);
-                        rs.put("file", handler.complete(name));
-                        rs.put("preview", prev);
-                        return rs;
-                    }).join();
-                }
+                return toAws.thenCombine(toPreview, (aws, prev) -> {
+                    Map<String, Object> rs = new HashMap<>();
+                    rs.put("info", vd);
+                    rs.put("file", handler.complete(name));
+                    rs.put("preview", prev);
+                    return rs;
+                }).join();
+
             }
         });
     }

@@ -127,6 +127,7 @@ public class AWSUploadService {
     }
 
     public void multipartUploadSync(String bucketName, String keyName, String contentType) {
+        System.out.println(bucketName + " " + keyName + " " + contentType);
         Regions clientRegion = Regions.US_EAST_2;
         String filePath = uploadDir;
 
@@ -235,7 +236,7 @@ public class AWSUploadService {
 
             // Now your file will have your image saved
             InputStream reader = new BufferedInputStream(object.getObjectContent());
-            try(OutputStream writer = new BufferedOutputStream(new FileOutputStream(localFile))){
+            try (OutputStream writer = new BufferedOutputStream(new FileOutputStream(localFile))) {
                 int read = -1;
                 while ((read = reader.read()) != -1) {
                     writer.write(read);
