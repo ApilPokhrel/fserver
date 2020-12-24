@@ -253,7 +253,11 @@ public class VideoController {
                         return rs;
                     });
                 }
-                return null;
+                Map<String, Object> rs = new HashMap<>();
+                rs.put("info", vd);
+                rs.put("file", model);
+                rs.put("preview", null);
+                return rs;
             } else {
                 System.out.println("Waiting .... ");
                 fileDownloadService.nioDownloadFile(url, name);
