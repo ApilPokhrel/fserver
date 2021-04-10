@@ -18,6 +18,7 @@ import com.mongodb.lang.NonNull;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import net.bramp.ffmpeg.FFmpeg;
 import net.bramp.ffmpeg.FFmpegExecutor;
@@ -64,16 +65,28 @@ public class FFMPEGService {
 
         return new VideoDetail(format.duration, height, width, format.size, mimeType);
     }
-    // 4 seconds after 3 seconds from front, 3 seconds from middle, 3 seconds from
-    // 40 seconds before last
 
-    // 5sec: format, 20: format, 30:format
-    public String createPreview(@NonNull String filename) {
+    private String getFullPath(String name) {
+        return uploadDir + File.separator + StringUtils.cleanPath(name);
+    }
+
+    public String smallDrop(String name, String scale, String tag) {
+        String mmm = name.replace(".mp4", "") + "_" + tag + ".mp4";
+
+        FFmpegExecutor executor = new FFmpegExecutor(this.ffmpeg, this.ffprobe);
+        FFmpegBuilder builder = new FFmpegBuilder().addInput(getFullPath(name)).addOutput(getFullPath(mmm))
+                .addExtraArgs("-vf").addExtraArgs("scale=" + scale).done();
+
+        executor.createJob(builder).run();
+        return mmm;
+    }
+
+    public String createPreview(@NonNull String input, String filename) {
         FFmpegProbeResult probeResult;
         try {
-            probeResult = ffprobe.probe(uploadDir + "/" + filename);
+            probeResult = ffprobe.probe(uploadDir + "/" + input);
         } catch (IOException e) {
-            throw new FFMPEGException(filename + " cannot format");
+            throw new FFMPEGException(input + " cannot format");
         }
         FFmpegFormat format = probeResult.getFormat();
 
@@ -82,7 +95,7 @@ public class FFMPEGService {
         double[] dd = generateClipTimes(duration);
         for (double d : dd) {
             String name = RandomStringUtils.randomAlphanumeric(10); // name of clip
-            generateClip(filename, d, name);
+            generateClip(input, d, name);
             clips.add(uploadDir + "/preview/" + name);
         }
 

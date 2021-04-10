@@ -1,6 +1,8 @@
 package com.fileserver.app.handler;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.fileserver.app.dao.file.FileInterface;
@@ -40,18 +42,65 @@ public class VideoHandler {
     public FileModel save(MultipartFile file, String origin, String name, String type, String uuid) {
         FileModel fileModel = new FileModel();
         fileService.uploadFile(file, name); // after this
+        VideoDetail vd = detail(name);
+        Map<String, Object> extras = new HashMap<>();
+        extras.put("duration", vd.getDuration());
+        extras.put("width", vd.getWidth());
+        extras.put("height", vd.getHeight());
+        extras.put("type", vd.getMimeType());
         fileModel.setName(name);
         fileModel.setMimeType(type);
         fileModel.setType(type);
         fileModel.setUuid(uuid);
         fileModel.setSize(file.getSize());
         fileModel.setOrigin(origin);
+        fileModel.setExtras(extras);
         return fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));
+    }
+
+    public FileModel save(String origin, String name, String type, String uuid) {
+        FileModel fileModel = new FileModel();
+        VideoDetail vd = detail(name);
+        Map<String, Object> extras = new HashMap<>();
+        extras.put("duration", vd.getDuration());
+        extras.put("width", vd.getWidth());
+        extras.put("height", vd.getHeight());
+        extras.put("type", vd.getMimeType());
+        fileModel.setName(name);
+        fileModel.setMimeType(type);
+        fileModel.setType(type);
+        fileModel.setUuid(uuid);
+        fileModel.setSize(vd.getSize());
+        fileModel.setOrigin(origin);
+        fileModel.setExtras(extras);
+        return fileInterface.add(fileModel).orElseThrow(() -> new NotFoundException(fns));
+    }
+
+    public FileModel resolution(String parent, String name, String contextType) {
+        FileModel model = new FileModel();
+        String res = ffmpegService.smallDrop(name, "-1:480", "480p"); // db store preview created
+        model.setName(res);
+        model.setType(type);
+        model.setMimeType(contextType);
+        model.setParent_id(new ObjectId(parent));
+        model.set_parent(false);
+        model.setSubType(SubTypeEnum.RESOLUTION);
+        model.setVersion(1);
+        model.setIdn("480p");
+        return fileInterface.add(model).orElseThrow(() -> new NotFoundException("preview not saved in db"));
+
     }
 
     public FileModel upload(String name, String contentType) {
         awsUploadService.multipartUploadSync(bucket, name, contentType);
         return fileInterface.updateStatus(name, true, false, false)
+                .orElseThrow(() -> new NotFoundException("file not updated while upload"));
+    }
+
+    public FileModel upload(String id) {
+        FileModel m = fileInterface.getById(id).orElseThrow();
+        awsUploadService.multipartUploadSync(bucket, m.getName(), m.getMimeType());
+        return fileInterface.updateStatus(m.getName(), true, false, false)
                 .orElseThrow(() -> new NotFoundException("file not updated while upload"));
     }
 
@@ -92,19 +141,32 @@ public class VideoHandler {
         } else {
             if (isPreview.isPresent())
                 fileInterface.removeById(isPreview.get().get_id());
-            previewModel = savePreview(parentId, filename, type);
+            previewModel = savePreview(parentId, filename, type, filename);
             uploadPreview(previewModel.getName(), type);
         }
         return completePreview(previewModel.getName());
+    }
+
+    public FileModel previewOnly(String parentId, String output, String type, String input) {
+        Optional<FileModel> isPreview = fileInterface.subFile(parentId, SubTypeEnum.PREVIEW);
+        FileModel previewModel;
+        if (isPreview.isPresent() && fileService.exists(isPreview.get().getName())) {
+            previewModel = isPreview.get();
+        } else {
+            if (isPreview.isPresent())
+                fileInterface.removeById(isPreview.get().get_id());
+            previewModel = savePreview(parentId, output, type, input);
+        }
+        return previewModel;
     }
 
     public void setProcessed(String id, boolean processed) {
         fileInterface.updateById(id, "processed", processed);
     }
 
-    private FileModel savePreview(String id, String fileName, String fileType) {
+    private FileModel savePreview(String id, String output, String fileType, String input) {
         FileModel previewModel = new FileModel();
-        String preview = ffmpegService.createPreview(fileName); // db store preview created
+        String preview = ffmpegService.createPreview(input, output); // db store preview created
         previewModel.setName(preview);
         previewModel.setType(type);
         previewModel.setMimeType(fileType);
@@ -114,13 +176,19 @@ public class VideoHandler {
         return fileInterface.add(previewModel).orElseThrow(() -> new NotFoundException("preview not saved in db"));
     }
 
-    private FileModel uploadPreview(String preview, String contentType) {
+    public FileModel uploadPreview(String preview, String contentType) {
         awsUploadService.upload(bucket, preview, contentType); // db store preview uploaded
         return fileInterface.updateStatus(preview, true, true, false)
                 .orElseThrow(() -> new NotFoundException("preview not updated while uploading"));
     }
 
-    private FileModel completePreview(String preview) {
+    public FileModel uploadSingle(String id) {
+        FileModel m = fileInterface.getById(id).orElseThrow();
+        awsUploadService.upload(bucket, m.getName(), m.getMimeType());
+        return fileInterface.updateStatus(m.getName(), true, false, false).orElseThrow();
+    }
+
+    public FileModel completePreview(String preview) {
         boolean isCompleted = fileService.remove(preview);
         return fileInterface.updateByName(preview, "completed", isCompleted)
                 .orElseThrow(() -> new NotSupportedException("preview not removed"));
