@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
+import com.fileserver.app.context.VideoContext;
 import com.fileserver.app.dao.file.FileInterface;
 import com.fileserver.app.dao.user.UserRolesInterface;
 import com.fileserver.app.entity.file.FileModel;
@@ -25,6 +26,7 @@ import com.fileserver.app.service.AWSUploadService;
 import com.fileserver.app.service.AuthService;
 import com.fileserver.app.service.FileDownloadService;
 import com.fileserver.app.service.FileService;
+import com.fileserver.app.util.FutureUtil;
 import com.fileserver.app.util.TokenUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -189,7 +191,7 @@ public class VideoController {
         return toAws.thenCombine(toPreview, (aws, prev) -> handler.complete(name));
     }
 
-    @PostMapping("/download")
+    @PostMapping("/download/old")
     public CompletableFuture<Object> uploadFileSync(@RequestParam("url") String url, @RequestParam("key") String name,
             @RequestParam("contentType") String contentType, @RequestParam("uuid") String uuid,
             @RequestParam("origin") String origin) {
@@ -208,9 +210,7 @@ public class VideoController {
             if (file.isPresent()) {
                 FileModel model = file.get();
                 if (!fileService.exists(name)) {
-                    System.out.println("Waiting .... ");
                     fileDownloadService.nioDownloadFile(url, name);
-                    System.out.println("Complete");
                 }
 
                 VideoDetail vd = handler.detail(name);
@@ -261,15 +261,9 @@ public class VideoController {
                         return rs;
                     });
                 }
-                Map<String, Object> rs = new HashMap<>();
-                rs.put("info", vd);
-                rs.put("file", model);
-                rs.put("preview", null);
-                return rs;
+                return null;
             } else {
-                System.out.println("Waiting .... ");
                 fileDownloadService.nioDownloadFile(url, name);
-                System.out.println("Complete");
                 VideoDetail vd = handler.detail(name);
                 FileModel model = new FileModel();
                 model.setOrigin(origin);
@@ -292,13 +286,59 @@ public class VideoController {
                 });
 
                 return toAws.thenCombine(toPreview, (aws, prev) -> {
+                    FileModel m = handler.complete(name);
                     Map<String, Object> rs = new HashMap<>();
                     rs.put("info", vd);
-                    rs.put("file", handler.complete(name));
+                    rs.put("file", m);
                     rs.put("preview", prev);
                     return rs;
                 }).join();
+            }
+        });
+    }
 
+    @PostMapping("/download")
+    public CompletableFuture<Object> downloadFileSync(@RequestParam("url") String url, @RequestParam("key") String name,
+            @RequestParam("contentType") String contentType, @RequestParam("uuid") String uuid,
+            @RequestParam("origin") String origin) {
+
+        if (contentType == null || !contentType.contains(type))
+            throw new NotSupportedException(fnv);
+
+        if (name.isBlank())
+            throw new NotFoundException("name not found");
+
+        if (uuid.isBlank())
+            throw new NotFoundException("uuid not found");
+
+        return CompletableFuture.supplyAsync(() -> {
+            Optional<FileModel> file = fileInterface.getByName(name);
+            if (file.isPresent()) {
+                FileModel model = file.get();
+                if (!fileService.exists(name)) {
+                    fileDownloadService.nioDownloadFile(url, name);
+                }
+
+                VideoContext context = new VideoContext(model, handler, fileInterface);
+                return FutureUtil.allOf(context.all()).thenApplyAsync(list -> {
+                    Map<String, Object> rs = new HashMap<>();
+                    rs.put("info", context.getModel().getExtras());
+                    rs.put("file", context.getModel());
+                    rs.put("sub", context.getSubs());
+                    return rs;
+                });
+
+            } else {
+                fileDownloadService.nioDownloadFile(url, name);
+                FileModel model = handler.save(origin, name, type, uuid);
+                VideoContext context = new VideoContext(model, handler, fileInterface);
+                return FutureUtil.allOf(context.all()).thenApplyAsync(list -> {
+                    Map<String, Object> rs = new HashMap<>();
+                    rs.put("info", context.getModel().getExtras());
+                    rs.put("file", context.getModel());
+                    rs.put("sub", context.getSubs());
+                    return rs;
+                });
             }
         });
     }
@@ -321,7 +361,10 @@ public class VideoController {
         }
 
         if (!model.isUploaded()) {
-            return CompletableFuture.supplyAsync(() -> handler.upload(model.getName(), model.getMimeType()));
+            return CompletableFuture.supplyAsync(() -> {
+                handler.upload(model.getName(), model.getMimeType());
+                return handler.complete(model.getName());
+            });
         }
 
         if (!model.isProcessed()) {
@@ -329,6 +372,7 @@ public class VideoController {
             return CompletableFuture.supplyAsync(() -> {
                 FileModel preview = handler.preview(model.get_id(), model.getName(), model.getMimeType());
                 handler.setProcessed(model.get_id(), true);
+                handler.complete(model.getName());
                 return preview;
             });
         }
@@ -445,5 +489,4 @@ public class VideoController {
         return CompletableFuture.supplyAsync(() -> ResponseEntity.ok(fileInterface.list(start, limit, q)))
                 .exceptionally(ex -> ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null));
     }
-
 }

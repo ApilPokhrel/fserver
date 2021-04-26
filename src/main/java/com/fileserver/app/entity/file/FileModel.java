@@ -1,6 +1,7 @@
 package com.fileserver.app.entity.file;
 
 import java.util.Date;
+import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -47,5 +48,6 @@ public @Data class FileModel {
     @Field("updated_at")
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private Date updatedAt;
+    private Map<String, Object> extras;
 
 }
